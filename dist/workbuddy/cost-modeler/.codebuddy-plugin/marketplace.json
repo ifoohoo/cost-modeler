@@ -1,0 +1,13 @@
+{
+  "name": "cost-modeler-local",
+  "owner": {
+    "name": "private"
+  },
+  "plugins": [
+    {
+      "name": "cost-modeler",
+      "source": "./plugins/cost-modeler",
+      "description": "软件成本建模：成本核算表格校验与按事实填写"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "cost-modeler",
+  "owner": {
+    "name": "ifoohoo"
+  },
+  "plugins": [
+    {
+      "name": "cost-modeler",
+      "source": "./dist/workbuddy/cost-modeler/plugins/cost-modeler",
+      "description": "软件成本建模：成本核算表格校验与按事实填写"
+    }
+  ]
+}

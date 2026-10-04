@@ -1,0 +1,20 @@
+{
+  "name": "cost-modeler",
+  "interface": {
+    "displayName": "软件成本建模"
+  },
+  "plugins": [
+    {
+      "name": "cost-modeler",
+      "source": {
+        "source": "local",
+        "path": "./dist/codex/cost-modeler"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
