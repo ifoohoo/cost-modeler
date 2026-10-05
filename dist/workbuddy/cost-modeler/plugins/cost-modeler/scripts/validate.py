@@ -41,6 +41,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def execute(args: argparse.Namespace, when: datetime | None = None) -> tuple[str, str, int, list[dict]]:
+    report, conclusion, exit_code, candidates, _context = _execute(args, when)
+    return report, conclusion, exit_code, candidates
+
+
+def _execute(args: argparse.Namespace, when: datetime | None = None) -> tuple[str, str, int, list[dict], dict]:
     opt = Options(
         state=args.状态,
         closing=bool(args.关账),
@@ -58,15 +63,18 @@ def execute(args: argparse.Namespace, when: datetime | None = None) -> tuple[str
     l2_ref.run(book, sink)
     l3_recalc.run(book, sink, opt)
     candidates = prefilter.collect(book)
+    context = prefilter.association_context(book)
+    context["工作簿"] = str(args.workbook.resolve())
     report, conclusion, exit_code = build(sink, opt, args.workbook.name, when or datetime.now())
-    return report, conclusion, exit_code, candidates
+    context["确定规则结论"] = conclusion
+    return report, conclusion, exit_code, candidates, context
 
 
 def main(argv: list[str] | None = None) -> int:
     if __package__ in (None, ""):
         sys.path.insert(0, str(ROOT))
     args = parse_args(argv)
-    report, _conclusion, exit_code, candidates = execute(args)
+    report, _conclusion, exit_code, candidates, context = _execute(args)
     if args.o:
         args.o.parent.mkdir(parents=True, exist_ok=True)
         args.o.write_text(report, encoding="utf-8")
@@ -77,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("\n")
         prefilter_path = Path("prefilter.json")
     prefilter_path.write_text(json.dumps(candidates, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    context_path = prefilter_path.with_name("association-context.json")
+    context_path.write_text(json.dumps(context, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return exit_code
 
 

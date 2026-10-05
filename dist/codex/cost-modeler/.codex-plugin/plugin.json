@@ -1,6 +1,6 @@
 {
   "name": "cost-modeler",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }
