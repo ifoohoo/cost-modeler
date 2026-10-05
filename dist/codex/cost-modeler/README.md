@@ -1,6 +1,6 @@
-# 软件成本建模 0.1.0 安装说明
+# 软件成本建模 0.1.1 安装说明
 
-「软件成本建模」（Cost Modeler）的插件名为 `cost-modeler`，版本 `0.1.0`。正式安装与更新从公开发行仓 `ifoohoo/cost-modeler` 走各宿主官方远端入口，跟踪默认分支 `main`。需要固定某一发布时，使用精确标签，首发为 `cost-modeler-v0.1.0`。钉在标签时，宿主更新命令不会自动改到新标签。正式路径不是手工解压 ZIP，也不是自建 marketplace。
+「软件成本建模」（Cost Modeler）的插件名为 `cost-modeler`，版本 `0.1.1`。正式安装与更新从公开发行仓 `ifoohoo/cost-modeler` 走各宿主官方远端入口，跟踪默认分支 `main`。需要固定某一发布时，使用精确标签，当前为 `cost-modeler-v0.1.1`。钉在标签时，宿主更新命令不会自动改到新标签。正式路径不是手工解压 ZIP，也不是自建 marketplace。
 
 五个入口名称固定：
 
@@ -75,7 +75,7 @@ claude plugin install cost-modeler@cost-modeler
 claude plugin update cost-modeler@cost-modeler
 ```
 
-官方说明：未开启自动更新时需要手动更新；宿主按插件 `version` 决定是否换成新副本。本包包内 `.claude-plugin/plugin.json` 的 `version` 为 `0.1.0`。固定某一发布时，添加目录写成 `ifoohoo/cost-modeler#cost-modeler-v0.1.0`。
+官方说明：未开启自动更新时需要手动更新；宿主按插件 `version` 决定是否换成新副本。本包包内 `.claude-plugin/plugin.json` 的 `version` 为 `0.1.1`。固定某一发布时，添加目录写成 `ifoohoo/cost-modeler#cost-modeler-v0.1.1`。
 
 # Grok
 
@@ -96,7 +96,7 @@ grok plugin update cost-modeler
 固定某一发布：
 
 ```bash
-grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.0#dist/claude/cost-modeler
+grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.1#dist/claude/cost-modeler
 ```
 
 `plugin install` 的 `<SOURCE>` 支持 Git URL、GitHub shorthand `user/repo`、`@ref` 与 `#subdir`。正常路径直接指向公开仓中的 `dist/claude/cost-modeler`。安装后新开会话，入口以 `/cost-modeler-fill` 这类名称出现。
@@ -131,11 +131,11 @@ codex plugin add cost-modeler@cost-modeler
 固定某一发布：
 
 ```bash
-codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.0
+codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.1
 codex plugin add cost-modeler@cost-modeler
 ```
 
-`owner/repo@ref` 与 `--ref` 等价，例如 `ifoohoo/cost-modeler@cost-modeler-v0.1.0`。
+`owner/repo@ref` 与 `--ref` 等价，例如 `ifoohoo/cost-modeler@cost-modeler-v0.1.1`。
 
 插件装入后，五入口 `SKILL.md` 在 `skills/<入口>/SKILL.md`，包根为插件根。这是路径推论，不是宿主实测。五个入口需要留在整包的 `skills/` 下，才能找到共享 `scripts/` 与文稿。Foundation 宿主描述仍给出技能根 `.agents/skills` 与 `skill-directory-v1`；那条路径带不走共享包根，正式安装走本节 CLI。
 
@@ -174,7 +174,7 @@ https://github.com/ifoohoo/cost-modeler.git
 ```json
 {
   "name": "cost-modeler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }
