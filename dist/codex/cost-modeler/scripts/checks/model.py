@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 
 DASH = "—"
@@ -170,11 +171,8 @@ EXPORT_SOURCE = {
     "页面路由": "页面路由",
 }
 
-LLM_PROMPT = """你在复核一套成本核算表格里的措辞疑点。规则只有两条：
-1. 业务侧的文字（活动名称、输入、输出、区块业务目的）必须说业务，不许出现系统实现名词：表名、字段名、类名、方法名、工具名、接口路径、英文标识符。
-2. 证据叙述必须说得清：「非业务功能理由」要说明为什么它不是业务功能；「区块业务目的」要说明这块给业务交出什么结果。
-
-下面是脚本筛出的候选行（JSON）。逐条复核，输出 JSON 数组，每条含：表名、行号、列名、疑点类别（业务语义红线／证据叙述不清／沿用措辞含糊）、一句问题说明、建议改法。拿不准的标「拿不准」，不许编造表格里没有的内容。没有疑点的行不进输出。"""
+LLM_PROMPT = """你在复核成本核算表格的业务表达。完整读取 association-context.json 中所有可读取的业务文本和证据正文；prefilter.json 只作定位线索，没有候选也要复核。按 SKILL.md 指定范围检查中文或英文实现词是否替代业务含义、业务目的和理由是否说清、沿用及否定说法是否与标签一致。证据栏允许必要技术细节；不按字数或关键词直接判错。
+先读取 <plugin-root>/references/报告模板.md 的终端用户报告文案。每条发现只选已有问题标题、固定解释和核实建议，填入真实位置、逐字原文及必要短事实；未知情况使用通用模板，不自由生成或改写文案。已有事实冲突列语义疑点；缺必要事实列资料不足；未检查的范围另列未复核。拿不准时指出待核事实，不编造内容，不把疑点升级为确定违规。"""
 
 
 class Rec(dict):
@@ -216,6 +214,7 @@ class Options:
     warn: Decimal = Decimal("0.10")
     limit: Decimal = Decimal("0.15")
     scale_digits: int = 4
+    validation_date: date | None = None
 
     @property
     def scale_q(self) -> Decimal:

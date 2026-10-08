@@ -98,25 +98,40 @@ def _row_context(book: WorkbookData, rec) -> dict:
 
 def _table_context(book: WorkbookData, logical: str) -> dict:
     name = LOGICAL_SHEET[logical]
-    table = book.tables.get(name)
-    reasons = []
-    if table is None or not table.present:
-        reasons.append("工作表缺失")
-    elif table.blocked:
-        if table.separator_missing:
-            reasons.append("填写区与示例区分隔行缺失")
-        if table.header_bad:
-            reasons.append("表头不合格")
-    rows = book.logical(logical)
+    names = [name]
+    if logical in ("分摊", "恒等式"):
+        names += [item for item in book.tables if item.startswith(name + "·")]
+    sheets = []
+    for sheet_name in names:
+        table = book.tables.get(sheet_name)
+        reasons = []
+        if table is None or not table.present:
+            reasons.append("工作表缺失")
+        elif table.blocked:
+            if table.separator_missing:
+                reasons.append("填写区与示例区分隔行缺失")
+            if table.header_bad:
+                reasons.append("表头不合格")
+        rows = table.rows if table and not table.blocked else []
+        sheets.append({
+            "表名": sheet_name,
+            "读取状态": "结构阻断" if reasons else ("空登记表" if not rows else "已读取"),
+            "阻断原因": reasons,
+            "表头": [
+                {"坐标": f"{get_column_letter(column)}{3 if logical == '表A' else 2}", "原文": header}
+                for column, header in enumerate(table.headers if table and table.present else [], start=1)
+            ],
+            "行": [_row_context(book, rec) for rec in rows],
+        })
+    rows = [row for sheet in sheets for row in sheet["行"]]
+    reasons = [f"{sheet['表名']}：{reason}" for sheet in sheets for reason in sheet["阻断原因"]]
     return {
         "表名": name,
         "读取状态": "结构阻断" if reasons else ("空登记表" if not rows else "已读取"),
         "阻断原因": reasons,
-        "表头": [
-            {"坐标": f"{get_column_letter(column)}{3 if logical == '表A' else 2}", "原文": header}
-            for column, header in enumerate(table.headers if table and table.present else [], start=1)
-        ],
-        "行": [_row_context(book, rec) for rec in rows],
+        "表头": sheets[0]["表头"],
+        "行": rows,
+        "工作表": [{key: value for key, value in sheet.items() if key != "行"} for sheet in sheets],
     }
 
 
@@ -188,7 +203,7 @@ def association_context(book: WorkbookData) -> dict:
     return {
         "语义复核状态": "未运行",
         "方法论": ["docs/方法论/05/article.md", "docs/方法论/06/article.md", "docs/教学文章/附录D-填写模板-v3.11.md"],
-        "表": {logical: _table_context(book, logical) for logical in ("表A", "表B", "功能", "机能", "明细")},
+        "表": {logical: _table_context(book, logical) for logical in LOGICAL_SHEET if logical not in ("清单", "全系统", "副本") or LOGICAL_SHEET[logical] in book.tables},
         "活动功能关联": activity_links,
         "功能机能关联": mechanism_links,
     }

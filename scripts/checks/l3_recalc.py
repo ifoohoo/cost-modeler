@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import date
 from decimal import Decimal
 
 from .load import WorkbookData
 from .messages import line, say
-from .model import DASH, Q2, Options, Sink
+from .model import DASH, ENDS, Q2, Options, Sink
 from .textutil import (
     D, backtick_keys, callers, cfpq, fset, key_ok, own_l4, period_of, pkey, qty, ref_l4s, rq, strip_mark, tailval, unkey,
 )
@@ -19,7 +20,7 @@ def run(book: WorkbookData, sink: Sink, opt: Options) -> None:
     _v15(book, sink)
     _v19(book, sink)
     _v26(book, sink, opt)
-    _v27(book, sink)
+    _v27(book, sink, opt)
     _v29(book, sink, opt)
     _v33(book, sink)
     _v34(book, sink)
@@ -150,13 +151,15 @@ def _base_for(book: WorkbookData, period: str, assigned: dict[str, str] | None) 
 
 
 def _v10(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-10", '表B'):
+        return
     functions = _functions(book)
     for rec in book.logical("表B"):
         codes = fset(rec.get("关联业务功能编号（F-）"))
         if rec.get("执行方式") == "线下" and not codes:
             if rec.get("下钻状态") != "不适用":
                 sink.add_fail("V-10", line("V-10", say("l3_recalc.V-10.2", p0=rec.row, p1=rec.get('下钻状态'))))
-        else:
+        elif not codes or book.readable(sink, "V-10", "功能"):
             want = "已下钻" if codes and all(code in functions and functions[code].get("下钻状态") == "已下钻" for code in codes) else "待下钻"
             if rec.get("下钻状态") != want:
                 sink.add_fail("V-10", line("V-10", say("l3_recalc.V-10.3", p0=rec.row, p1=want, p2=rec.get('下钻状态'))))
@@ -165,6 +168,8 @@ def _v10(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v15(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-15", '功能', '机能'):
+        return
     rows = book.logical("功能")
     if not rows:
         sink.set_na("V-15", "功能登记表的行")
@@ -204,6 +209,12 @@ def _want_status(book: WorkbookData, rec) -> str:
 
 
 def _v19(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-19", '机能', '功能', '表B', '表A'):
+        # 来源标签只依赖本行，其他表阻断不妨碍确认这一项。
+        for rec in book.logical("机能"):
+            if rec.get("下钻状态") == "未登记" and "待查：" not in rec.get("来源证据", ""):
+                sink.add_fail("V-19", line("V-19", say("l3_recalc.V-19.1", p0=rec.row)))
+        return
     for rec in book.logical("机能"):
         want = _want_status(book, rec)
         extra = ""
@@ -218,7 +229,26 @@ def _v19(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v26(book: WorkbookData, sink: Sink, opt: Options) -> None:
+    names = ("功能点计算表·机能规模汇总", "功能点计算表·数据移动明细", "机能登记表")
+    blocked = [name for name in names if name not in book.tables or book.tables[name].blocked]
+    if blocked:
+        sink.set_unable("V-26", line("V-26", say("check.blocked", p0="、".join(blocked))))
+        return
+    for logical in ("汇总", "机能"):
+        keys = [unkey(rec.get("主键")) for rec in book.logical(logical)]
+        if len(keys) != len(set(keys)):
+            sink.set_unable("V-26", line("V-26", say("check.ambiguous", p0=book.logical(logical)[0].sheet)))
+            return
     summary = {unkey(rec.get("主键")): rec for rec in book.logical("汇总")}
+    machines = _machines(book)
+    measured = {unkey(rec.get("机能主键")) for rec in book.logical("明细") if rec.get("机能主键") not in ("", DASH)}
+    for key in sorted(measured - summary.keys()):
+        sink.add_fail("V-26", line("V-26", say("l3_recalc.V-26.missing_summary", p0=key)))
+    for key, rec in summary.items():
+        if key not in machines:
+            sink.add_fail("V-26", line("V-26", say("l3_recalc.V-26.missing_machine", p0=rec.row, p1=key)))
+        elif rec.get("下钻状态") != machines[key].get("下钻状态"):
+            sink.add_fail("V-26", line("V-26", say("l3_recalc.V-26.state", p0=rec.row, p1=rec.get("下钻状态"), p2=machines[key].get("下钻状态"))))
     if not summary:
         sink.set_na("V-26", "机能规模汇总的行")
         return
@@ -304,73 +334,144 @@ def _real_token(value: str) -> bool:
 
 
 def _reuse_declaration(declared: str):
-    """复用类型、被复用机能、版本、契约引用都要有实值。缺一项按新建。"""
-    if not _real_token(declared):
-        return None, None
-    kind = re.search(r"复用类型：(多端|跨版本)", declared)
-    machine = re.search(r"被复用机能：([^；]*)", declared)
-    version = re.search(r"版本：([^；]*)", declared)
-    contract = re.search(r"契约引用：([^；]*)", declared)
-    if not (kind and machine and version and contract):
-        return None, None
-    if not (_real_token(machine.group(1)) and _real_token(version.group(1)) and _real_token(contract.group(1))):
-        return None, None
-    return kind.group(1), unkey(machine.group(1))
+    """声明中的类型、机能、版本、契约必须唯一且有实值。"""
+    values = {}
+    for part in declared.split("；"):
+        label, sep, value = part.partition("：")
+        if sep and label in ("复用类型", "被复用机能", "版本", "契约引用"):
+            if label in values or not _real_token(value):
+                return None
+            values[label] = unkey(value)
+    if set(values) != {"复用类型", "被复用机能", "版本", "契约引用"} or values["复用类型"] not in ("多端", "跨版本"):
+        return None
+    return values
 
 
-def _v27(book: WorkbookData, sink: Sink) -> None:
+def _reuse_coefficient(evidence: str):
+    """只解释给定系数，不选择组织取值。支持十进制、百分数和分数。"""
+    if evidence.count("复用系数：") != 1:
+        return None, ""
+    raw = evidence.split("复用系数：", 1)[1].split("；", 1)[0].strip()
+    match = re.fullmatch(r"(\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?%?)(.*)", raw)
+    if not match:
+        return None, ""
+    token, source = match.groups()
+    # 系数与出处必须有分界，避免把 0.5abc 等混合值截成 0.5。
+    if source and not source.startswith((" ", "（", "(", "，", ",", "；")):
+        return None, ""
+    try:
+        numerator, slash, denominator = token.rstrip("%").partition("/")
+        value = Decimal(numerator) / (Decimal(denominator) if slash else 1)
+        if token.endswith("%"):
+            value /= 100
+    except ArithmeticError:
+        return None, ""
+    if not value.is_finite() or not 0 <= value <= 1:
+        return None, ""
+    source = source.strip(" （），(),")
+    return value, source if _real_token(source) else ""
+
+
+def _v27(book: WorkbookData, sink: Sink, opt: Options) -> None:
     rows = book.logical("汇总")
+    table = book.tables.get("功能点计算表·机能规模汇总")
+    if table is None or table.blocked:
+        sink.set_unable("V-27", line("V-27", say("check.blocked", p0="功能点计算表·机能规模汇总")))
+        return
     if not rows:
         sink.set_na("V-27", "机能规模汇总的行")
         return
     machines = _machines(book)
-    ledger = {unkey(rec.get("主键")) for rec in book.logical("登记簿")}
+    ledger = {(unkey(rec.get("主键")), rec.get("建设版本")) for rec in book.logical("登记簿")}
     for rec in rows:
         key = unkey(rec.get("主键"))
-        column_1, column_2, column_b = D(rec.get("列一 不复用")), D(rec.get("列二 复用")), D(rec.get("列 B 分摊后规模（归集用）"))
+        numbers = [D(rec.get(column)) for column in ("列一 不复用", "列二 复用", "列 B 分摊后规模（归集用）")]
+        column_1, column_2, column_b = [value if value is not None and value.is_finite() else None for value in numbers]
         reasons = []
         if column_1 != column_b:
             reasons.append(say("frag.045"))
         if column_1 is not None and column_2 is not None and column_2 > column_1:
             reasons.append(say("frag.046"))
-        declared = rec.get("复用声明", "")
-        kind_name, reused = _reuse_declaration(declared)
-        complete = kind_name is not None
-        if complete:
-            if kind_name == "跨版本":
-                complete = reused in ledger
+        discount = column_1 is not None and column_2 is not None and column_2 < column_1
+        declaration = _reuse_declaration(rec.get("复用声明", ""))
+        if discount:
+            if declaration is None:
+                reasons.append(say("frag.047"))
             else:
-                mine = machines.get(key)
-                other = machines.get(reused)
-                complete = bool(other and mine and other.get("主归属功能编号") == mine.get("主归属功能编号"))
-        if not complete and column_1 is not None and column_2 is not None and column_2 < column_1:
-            reasons.append(say("frag.047"))
-        if column_1 is not None and column_2 is not None and column_2 < column_1 and "复用系数：" not in rec.get("来源证据", ""):
-            reasons.append(say("frag.048"))
+                reused = declaration["被复用机能"]
+                dep = "能力登记簿" if declaration["复用类型"] == "跨版本" else "机能登记表"
+                dep_table = book.tables.get(dep)
+                if dep_table is None or dep_table.blocked:
+                    sink.set_unable("V-27", line("V-27", say("check.blocked", p0=dep)))
+                elif declaration["复用类型"] == "跨版本":
+                    matching = [item for item in book.logical("登记簿") if unkey(item.get("主键")) == reused and item.get("建设版本") == declaration["版本"]]
+                    if len(matching) > 1:
+                        sink.set_unable("V-27", line("V-27", say("check.ambiguous", p0=dep)))
+                    elif (reused, declaration["版本"]) not in ledger:
+                        reasons.append(say("l3_recalc.V-27.version"))
+                else:
+                    relevant = [unkey(item.get("主键")) for item in book.logical("机能") if unkey(item.get("主键")) in (key, reused)]
+                    if len(relevant) != len(set(relevant)):
+                        sink.set_unable("V-27", line("V-27", say("check.ambiguous", p0=dep)))
+                    else:
+                        mine, other = machines.get(key), machines.get(reused)
+                        if not (mine and other and mine.get("主归属功能编号") == other.get("主归属功能编号") and mine.get("主归属功能编号") not in ("", DASH)):
+                            reasons.append(say("frag.047"))
+                        if not (mine and other and mine.get("类型") == other.get("类型") == "画面" and mine.get("端") in ENDS and other.get("端") in ENDS and mine.get("端") != other.get("端")):
+                            reasons.append(say("l3_recalc.V-27.end"))
+            evidence = rec.get("来源证据", "")
+            coefficient, source = _reuse_coefficient(evidence)
+            if "复用系数：" not in evidence:
+                reasons.append(say("frag.048"))
+            elif coefficient is None:
+                reasons.append(say("l3_recalc.V-27.coefficient"))
+            elif not source:
+                reasons.append(say("l3_recalc.V-27.source"))
+            if coefficient is not None:
+                expected = rq(column_1 * coefficient, opt.scale_q)
+                if column_2 != expected:
+                    reasons.append(say("l3_recalc.V-27.amount", p0=column_1, p1=coefficient, p2=expected, p3=column_2))
         if reasons:
             sink.add_fail("V-27", line("V-27", say("l3_recalc.V-27.1", p0=key, p1='／'.join(reasons))))
 
 
 def _v29(book: WorkbookData, sink: Sink, opt: Options) -> None:
+    table = book.tables.get("机能登记表")
+    if table is None or table.blocked:
+        sink.set_unable("V-29", line("V-29", say("check.blocked", p0="机能登记表")))
+        return
     rows = book.logical("机能")
     unread = [rec for rec in rows if rec.get("下钻状态") == "未登记"]
     pending = [rec for rec in rows if rec.get("下钻状态") == "待下钻"]
     if opt.state == "正常态" and unread:
         numbers = "、".join(str(rec.row) for rec in unread)
         sink.add_fail("V-29", line("V-29", say("l3_recalc.V-29.1", p0=len(unread), p1=numbers)))
-    dated = False
     for rec in rows:
-        matched = re.search(r"下线建议：[^；]*；[^；]*；(\d{4}-\d\d-\d\d)", rec.get("来源证据", ""))
-        if matched:
-            dated = True
-    if dated:
-        sink.set_unable("V-29", line("V-29", say("l3_recalc.V-29.2")))
+        evidence = rec.get("来源证据", "")
+        if "下线建议：" not in evidence:
+            continue
+        matched = re.search(r"下线建议：([^；]+)；(\d{4}-\d{2}-\d{2})；(\d{4}-\d{2}-\d{2})(?=；|$)", evidence)
+        try:
+            if matched is None or not _real_token(matched.group(1)) or evidence.count("下线建议：") != 1:
+                raise ValueError
+            proposed, deadline = date.fromisoformat(matched.group(2)), date.fromisoformat(matched.group(3))
+            if proposed > deadline:
+                raise ValueError
+        except ValueError:
+            sink.add_fail("V-29", line("V-29", say("l3_recalc.V-29.invalid", p0=rec.row)))
+            continue
+        if opt.validation_date is None:
+            sink.set_unable("V-29", line("V-29", say("l3_recalc.V-29.2", p0=rec.row)))
+        elif opt.validation_date > deadline:
+            sink.add_fail("V-29", line("V-29", say("l3_recalc.V-29.expired", p0=rec.row, p1=deadline, p2=opt.validation_date)))
+        else:
+            sink.add_warn("V-29", line("V-29", say("l3_recalc.V-29.scheduled", p0=rec.row, p1=unkey(rec.get("主键")), p2=deadline, p3=opt.validation_date)))
     if opt.state == "正常态" and opt.closing and pending:
         numbers = "、".join(str(rec.row) for rec in pending)
         sink.add_fail("V-29", line("V-29", say("l3_recalc.V-29.3", p0=len(pending), p1=numbers)))
-    elif pending and not opt.closing:
-        numbers = "、".join(str(rec.row) for rec in pending)
-        sink.add_warn("V-29", line("V-29", say("l3_recalc.V-29.4", p0=len(pending))))
+    elif pending:
+        for rec in pending:
+            sink.add_warn("V-29", line("V-29", say("l3_recalc.V-29.pending", p0=rec.row, p1=unkey(rec.get("主键")))))
 
 
 SPLIT = re.compile(r"切分：已指名\s*([\d.]+)\s*／\s*未指名\s*([\d.]+)")
@@ -413,11 +514,14 @@ def _split_reasons(rows, period, pool, cost, amount, book: WorkbookData) -> list
 
 
 def _v33(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-33", '分摊')
     groups = _groups(book)
     if not groups:
         sink.set_na("V-33", "需要重算的池")
         return
-    assigned = _summary_periods(book)
+    alloc_complete = book.readable(sink, "V-33", "分摊")
+    scale_readable = book.readable(sink, "V-33", "汇总", "机能", "功能")
+    assigned = _summary_periods(book) if alloc_complete and scale_readable else None
     marked = defaultdict(set)
     pool_names = set()
     bare_names = set()
@@ -435,7 +539,7 @@ def _v33(book: WorkbookData, sink: Sink) -> None:
     for (period, pool, cost), rows in groups.items():
         label = f"{period}{pool}{cost}"
         reasons = []
-        if str(cost).startswith("归挂："):
+        if str(cost).startswith("归挂：") and book.readable(sink, "V-33", "机能"):
             name = str(cost)[len("归挂："):]
             if name.endswith("）"):
                 reasons.append(say("frag.050"))
@@ -461,7 +565,7 @@ def _v33(book: WorkbookData, sink: Sink) -> None:
             sink.add_fail("V-33", line("V-33", say("l3_recalc.V-33.1", p0=label, p1='／'.join(dict.fromkeys(reasons)))))
             continue
         diff = amount - sum((D(rec.get("分摊额")) or Decimal(0)) for rec in rows)
-        if diff != 0:
+        if alloc_complete and diff != 0:
             reasons.append(say("frag.052", p0=diff))
         driver = rows[0].get("动因")
         users = [rec.get("使用方业务功能") for rec in rows]
@@ -503,7 +607,8 @@ def _v33(book: WorkbookData, sink: Sink) -> None:
         elif driver == "全盘业务 CFP 占比":
             whole = _base_for(book, period, assigned)
             if whole is None:
-                reasons.extend(_split_reasons(rows, period, pool, cost, amount, book))
+                if alloc_complete:
+                    reasons.extend(_split_reasons(rows, period, pool, cost, amount, book))
                 if reasons:
                     sink.add_fail("V-33", line("V-33", say("l3_recalc.V-33.1", p0=label, p1='／'.join(dict.fromkeys(reasons)))))
                 sink.set_unable("V-33", line("V-33", say("l3_recalc.V-33.4", p0=label)))
@@ -516,6 +621,10 @@ def _v33(book: WorkbookData, sink: Sink) -> None:
             base = {code: Decimal(1) for code in users}
             total = sum(base.values(), Decimal(0))
             partial = False
+        if not alloc_complete:
+            if reasons:
+                sink.add_fail("V-33", line("V-33", say("l3_recalc.V-33.1", p0=label, p1="／".join(dict.fromkeys(reasons)))))
+            continue
         if not total:
             reasons.append(say("frag.056"))
             sink.add_fail("V-33", line("V-33", say("l3_recalc.V-33.1", p0=label, p1='／'.join(dict.fromkeys(reasons)))))
@@ -550,6 +659,9 @@ def _row_tuple(rec) -> tuple:
 
 
 def _v34(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-34", '分摊', '副本')
+    if not book.readable(sink, "V-34", "副本"):
+        return
     if book.copy_rows is None:
         sink.set_unable("V-34", line("V-34", say("l3_recalc.V-34.1")))
         return
@@ -565,11 +677,13 @@ def _v34(book: WorkbookData, sink: Sink) -> None:
         if _row_tuple(rec) not in copy_set:
             sink.add_fail("V-34", line("V-34", say("l3_recalc.V-34.2", p0=rec.get('期次'), p1=rec.row)))
     for rec in copies:
-        if _row_tuple(rec) not in current_set:
+        if book.readable(sink, "V-34", "分摊") and _row_tuple(rec) not in current_set:
             sink.add_fail("V-34", line("V-34", say("l3_recalc.V-34.2", p0=rec.get('期次'), p1=rec.row)))
 
 
 def _v35(book: WorkbookData, sink: Sink, opt: Options) -> None:
+    if not book.readable(sink, "V-35", '汇总', '机能', '功能'):
+        return
     rows = book.logical("汇总")
     if not rows:
         sink.set_na("V-35", "机能规模汇总的行")
@@ -596,6 +710,7 @@ def _v35(book: WorkbookData, sink: Sink, opt: Options) -> None:
 
 
 def _v37(book: WorkbookData, sink: Sink, opt: Options) -> None:
+    book.readable(sink, "V-37", '机能', '分摊')
     unread = [rec for rec in book.logical("机能") if rec.get("下钻状态") == "未登记"]
     alloc = [rec for rec in book.logical("分摊") if rec.get("下钻状态") == "未登记"]
     if not unread and not alloc:
@@ -614,6 +729,7 @@ def _v37(book: WorkbookData, sink: Sink, opt: Options) -> None:
 
 
 def _v38(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-38", '分摊', '不计入', '恒等式', '全系统')
     alloc = book.logical("分摊")
     excluded = book.logical("不计入")
     identity = book.logical("恒等式")
@@ -622,12 +738,17 @@ def _v38(book: WorkbookData, sink: Sink) -> None:
     if not periods and not identity and not system:
         sink.set_na("V-38", "分摊或不计入投入的期次")
         return
+    alloc_complete = book.readable(sink, "V-38", "分摊")
+    identity_complete = book.readable(sink, "V-38", "恒等式")
+    excluded_complete = book.readable(sink, "V-38", "不计入")
     reasons_by_key = defaultdict(list)
 
     def add(key, text, *, move_row=False, scope_system=False):
         reasons_by_key[key].append((text, move_row, scope_system))
 
     for rec in alloc:
+        if not book.readable(sink, "V-38", "表B"):
+            break
         expect = _l4_of(book, rec.get("使用方业务功能", ""))
         if expect != rec.case:
             add(rec.get("期次"), say("frag.063", p0=(rec.row)), move_row=True)
@@ -641,24 +762,32 @@ def _v38(book: WorkbookData, sink: Sink) -> None:
         if scope != rec.case:
             add(period, say("frag.065"), scope_system=True)
         counted[(scope, period)] += 1
+        if D(rec.get("Σ剔除额")) != Decimal("0.00") and D(rec.get("Σ剔除额")) != Decimal("0"):
+            add(period, say("frag.067", p0=(rec.get('Σ剔除额'))))
+        if D(rec.get("实际成本总额")) != (D(rec.get("Σ分摊额")) or Decimal(0)) + (D(rec.get("Σ剔除额")) or Decimal(0)):
+            add(period, say("frag.068", p0=(rec.get('实际成本总额'))))
+        alloc_table = book.tables.get("分摊表·" + scope)
+        scope_readable = alloc_table is not None and not alloc_table.blocked
+        if not scope_readable:
+            # 无分表仍是缺失；已有但阻断的分表不能当作零。
+            if alloc_table is not None and alloc_table.blocked:
+                continue
         if (scope, period) not in present:
             add(period, say("frag.064"), scope_system=True)
             continue
         total_alloc = sum((D(item.get("分摊额")) or Decimal(0)) for item in alloc if item.get("期次") == period and item.case == scope)
         if D(rec.get("Σ分摊额")) != total_alloc:
             add(period, say("frag.066", p0=(D(rec.get('Σ分摊额')) - total_alloc if D(rec.get('Σ分摊额')) is not None else '读不出')))
-        if D(rec.get("Σ剔除额")) != Decimal("0.00") and D(rec.get("Σ剔除额")) != Decimal("0"):
-            add(period, say("frag.067", p0=(rec.get('Σ剔除额'))))
-        if D(rec.get("实际成本总额")) != (D(rec.get("Σ分摊额")) or Decimal(0)) + (D(rec.get("Σ剔除额")) or Decimal(0)):
-            add(period, say("frag.068", p0=(rec.get('实际成本总额'))))
     for scope, period in present:
-        if counted[(scope, period)] == 0:
+        if identity_complete and counted[(scope, period)] == 0:
             add(period, say("frag.064"), scope_system=True)
     all_periods = {rec.get("期次") for rec in alloc} | {period_of(rec.get("来源证据", "")) for rec in excluded if period_of(rec.get("来源证据", ""))}
     for rec in system:
-        if rec.get("期次") not in all_periods:
+        if alloc_complete and excluded_complete and rec.get("期次") not in all_periods:
             add(rec.get("期次"), say("frag.064"), scope_system=True)
     for period in sorted(periods, key=pkey):
+        if not book.readable(sink, "V-38", "全系统"):
+            break
         rows = [rec for rec in system if rec.get("期次") == period and rec.get("范围") == "本片合计"]
         if any(rec.get("范围") != "本片合计" for rec in system if rec.get("期次") == period):
             add(period, say("frag.064"), scope_system=True)
@@ -669,14 +798,14 @@ def _v38(book: WorkbookData, sink: Sink) -> None:
         total_alloc = sum((D(item.get("分摊额")) or Decimal(0)) for item in alloc if item.get("期次") == period)
         removed = [item for item in excluded if period_of(item.get("来源证据", "")) == period]
         removed_sum = sum((D(item.get("投入量")) or Decimal(0)) for item in removed)
-        if D(rec.get("Σ分摊额")) != total_alloc:
+        if alloc_complete and D(rec.get("Σ分摊额")) != total_alloc:
             add(period, say("frag.066", p0=(D(rec.get('Σ分摊额')) - total_alloc if D(rec.get('Σ分摊额')) is not None else '读不出')))
-        if D(rec.get("Σ剔除额")) != removed_sum:
+        if excluded_complete and D(rec.get("Σ剔除额")) != removed_sum:
             add(period, say("frag.067", p0=(D(rec.get('Σ剔除额')) - removed_sum if D(rec.get('Σ剔除额')) is not None else '读不出')))
         if D(rec.get("实际成本总额")) != (D(rec.get("Σ分摊额")) or Decimal(0)) + (D(rec.get("Σ剔除额")) or Decimal(0)):
             add(period, say("frag.068", p0=((D(rec.get("实际成本总额")) or Decimal(0)) - ((D(rec.get("Σ分摊额")) or Decimal(0)) + (D(rec.get("Σ剔除额")) or Decimal(0))))))
         subtotal = sum((D(item.get("Σ分摊额")) or Decimal(0)) for item in identity if item.get("期次") == period and item.get("范围") != "本片合计")
-        if D(rec.get("Σ分摊额")) != subtotal:
+        if identity_complete and D(rec.get("Σ分摊额")) != subtotal:
             add(period, say("frag.065"), scope_system=True)
     for period, tagged in reasons_by_key.items():
         unique = []
@@ -693,6 +822,7 @@ def _v38(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v39(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-39", '不计入', '分摊')
     pattern = re.compile(r"折算：\s*([\d.]+)\s*工时\s*×\s*([\d.]+)")
     targets = []
     for rec in book.logical("不计入"):
@@ -778,6 +908,7 @@ def _reused_systems(book: WorkbookData, key: str) -> set[str]:
 
 
 def _v41(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-41", '分摊', '不计入')
     machines = _machines(book)
     functions = _functions(book)
     seen = False
@@ -786,8 +917,10 @@ def _v41(book: WorkbookData, sink: Sink) -> None:
         for matched in re.finditer(r"(?<!他系统)(?:含)?接入：", evidence):
             seen = True
             wrapped = re.match(r"`([^`]+)`", evidence[matched.end():])
-            if not wrapped or not key_ok(wrapped.group(1)) or wrapped.group(1) not in machines:
+            if not wrapped or not key_ok(wrapped.group(1)) or (book.readable(sink, "V-41", "机能") and wrapped.group(1) not in machines):
                 sink.add_fail("V-41", line("V-41", say("l3_recalc.V-41.2", p0=rec.row)))
+                continue
+            if not book.readable(sink, "V-41", "机能", "功能", "表B", "分摊", "副本"):
                 continue
             key = wrapped.group(1)
             left = _systems(book, [rec.get("使用方业务功能")])
@@ -808,7 +941,7 @@ def _v41(book: WorkbookData, sink: Sink) -> None:
         pool = re.search(r"原池：(\S+) (`[^`]+`|[^；]+)", rec.get("来源证据", ""))
         if not pool:
             reasons.append(say("frag.071"))
-        else:
+        elif book.readable(sink, "V-41", "机能", "功能", "表B", "分摊", "副本"):
             kind, cost = pool.group(1), unkey(pool.group(2).strip())
             if key_ok(cost):
                 right = _reused_systems(book, cost) if cost in machines else set()

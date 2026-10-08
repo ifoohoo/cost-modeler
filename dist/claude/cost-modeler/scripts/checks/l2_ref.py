@@ -30,6 +30,8 @@ def run(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v06(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-06", '机能'):
+        return
     if book.catalog is None or book.catalog_missing_files:
         sink.set_unable("V-06", line(
             "V-06",
@@ -47,6 +49,8 @@ def _v06(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v07(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-07", '表A', '表B'):
+        return
     codes = {rec.get("编码", "") for rec in book.logical("表A")}
     for rec in book.logical("表B"):
         if rec.get("主键", "") not in codes:
@@ -54,6 +58,8 @@ def _v07(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v08(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-08", '功能', '表B'):
+        return
     functions = {rec.get("主键"): rec for rec in book.logical("功能")}
     for rec in book.logical("表B"):
         for code in fset(rec.get("关联业务功能编号（F-）")):
@@ -65,6 +71,8 @@ def _v08(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v09(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-09", '表A', '表B'):
+        return
     known = {code.rsplit(".", 1)[0] for code in (rec.get("编码", "") for rec in book.logical("表A")) if "." in code}
     targets = []
     for rec in book.logical("表B"):
@@ -89,6 +97,8 @@ def _cell_letters(cell: str) -> frozenset[str]:
 
 
 def _v11(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-11", '表A'):
+        return
     if book.previous is None:
         sink.set_unable("V-11", line("V-11", say("l2_ref.V-11.1")))
         return
@@ -128,6 +138,7 @@ def _v11(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v12(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-12", "补登")
     rows = book.logical("补登")
     if not rows:
         sink.set_na("V-12", "流程补登清单的行")
@@ -143,7 +154,7 @@ def _v12(book: WorkbookData, sink: Sink) -> None:
                 reasons.append(say("frag.030"))
             if rec.get("拟挂业务功能编号（F-）") == DASH:
                 reasons.append(say("frag.031"))
-            if matched.group(1) not in codes:
+            if book.readable(sink, "V-12", "表A") and matched.group(1) not in codes:
                 reasons.append(say("frag.032"))
         if reasons:
             sink.add_fail("V-12", line("V-12", say("l2_ref.V-12.1", p0=rec.row, p1='／'.join(reasons))))
@@ -177,6 +188,8 @@ def _object_mismatch(rec, listed, wanted) -> str:
 
 
 def _v13_objects(book: WorkbookData, sink: Sink, rec, listed, wanted, costs: set[str]) -> None:
+    if not book.readable(sink, "V-13", "机能", "明细", "分摊", "副本"):
+        return
     if book.copy_rows is None:
         sink.set_unable("V-13", line(
             "V-13",
@@ -207,6 +220,7 @@ def _v13_objects(book: WorkbookData, sink: Sink, rec, listed, wanted, costs: set
 
 
 def _v13(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-13", "功能")
     rows = book.logical("功能")
     if not rows:
         sink.set_na("V-13", "功能登记表的行")
@@ -272,6 +286,7 @@ def _acts(rec) -> tuple[set[str] | None, str | None]:
 
 
 def _v20(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-20", "机能")
     rows = [rec for rec in book.logical("机能") if rec.get("下钻状态") == "本质无单一归属"]
     if not rows:
         sink.set_na("V-20", "「本质无单一归属」的机能行")
@@ -281,7 +296,7 @@ def _v20(book: WorkbookData, sink: Sink) -> None:
     for rec in rows:
         found, source = _acts(rec)
         reasons = []
-        if found is None or any(item not in activities for item in found):
+        if found is None or (book.readable(sink, "V-20", "表B") and any(item not in activities for item in found)):
             missing = "、".join(sorted(item for item in (found or []) if item not in activities)) or "（没有受益活动）"
             reasons.append(say("frag.033", p0=missing))
         if source not in ("接口契约", "菜单-功能映射", "事件订阅表", "人工认定"):
@@ -301,6 +316,7 @@ def _v20(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v21(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-21", "机能")
     functions = {rec.get("主键") for rec in book.logical("功能")}
     machines = {unkey(rec.get("主键")): rec for rec in book.logical("机能")}
     for rec in book.logical("机能"):
@@ -310,14 +326,14 @@ def _v21(book: WorkbookData, sink: Sink) -> None:
             reasons.append(say("frag.036"))
         if owner != DASH and len(fset(owner)) != 1:
             reasons.append(say("frag.037"))
-        elif owner != DASH and owner not in functions:
+        elif owner != DASH and book.readable(sink, "V-21", "功能") and owner not in functions:
             reasons.append(say("frag.038"))
         if "随调用方：" in rec.get("来源证据", ""):
             caller_ids = re.findall(r"`([^`]+)`", rec.get("来源证据", "").split("随调用方：", 1)[1])
             owners = sorted(machines[item].get("主归属功能编号") for item in caller_ids if item in machines and machines[item].get("主归属功能编号") != DASH)
             if owners and owner != owners[0]:
                 reasons.append(say("frag.039"))
-        if "主归属断法：F 编号升序" in rec.get("来源证据", ""):
+        if "主归属断法：F 编号升序" in rec.get("来源证据", "") and book.readable(sink, "V-21", "明细"):
             triggered = sorted({
                 code
                 for detail in book.logical("明细")
@@ -331,6 +347,8 @@ def _v21(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v23(book: WorkbookData, sink: Sink) -> None:
+    if not book.readable(sink, "V-23", '机能', '明细'):
+        return
     hosts = set()
     for rec in book.logical("机能"):
         key = unkey(rec.get("主键", ""))
@@ -343,6 +361,7 @@ def _v23(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v25(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-25", "明细")
     rows = book.logical("明细")
     if not rows:
         sink.set_na("V-25", "数据移动明细的行")
@@ -350,7 +369,7 @@ def _v25(book: WorkbookData, sink: Sink) -> None:
     functions = {rec.get("主键") for rec in book.logical("功能")}
     for rec in rows:
         for code in fset(rec.get("触发业务功能编号")):
-            if code not in functions:
+            if book.readable(sink, "V-25", "功能") and code not in functions:
                 sink.add_fail("V-25", line("V-25", say("l2_ref.V-25.2", p0=rec.get('功能过程名'), p1=code)))
     groups = defaultdict(lambda: defaultdict(list))
     for rec in rows:
@@ -371,18 +390,65 @@ def _v25(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v28(book: WorkbookData, sink: Sink) -> None:
-    rows = book.logical("链路")
-    if not rows:
-        sink.set_na("V-28", "链路核对视图的行")
+    blocked = [name for name in ("链路核对视图", "机能登记表") if name not in book.tables or book.tables[name].blocked]
+    if blocked:
+        sink.set_unable("V-28", line("V-28", say("check.blocked", p0="、".join(blocked))))
         return
+    rows = book.logical("链路")
     machines = {unkey(rec.get("主键")): rec for rec in book.logical("机能")}
+    if not rows and not machines:
+        sink.set_na("V-28", "链路核对视图与机能登记表的行")
+        return
+    derived_blocked = [name for name in ("表 B 成本侧活动扩展表", "功能登记表") if name not in book.tables or book.tables[name].blocked]
+    if derived_blocked:
+        sink.set_unable("V-28", line("V-28", say("check.blocked", p0="、".join(derived_blocked))))
+    ambiguous = []
+    for logical, column in (("机能", "主键"), ("功能", "主键"), ("表B", "主键")):
+        keys = [unkey(rec.get(column)) for rec in book.logical(logical)]
+        if len(keys) != len(set(keys)):
+            ambiguous.append(book.logical(logical)[0].sheet)
+    if ambiguous:
+        sink.set_unable("V-28", line("V-28", say("check.ambiguous", p0="、".join(ambiguous))))
+    functions = {rec.get("主键"): rec for rec in book.logical("功能")}
+    linked = {unkey(rec.get("主键")) for rec in rows}
+    for key, rec in machines.items():
+        if key not in linked:
+            sink.add_fail("V-28", line("V-28", say("l2_ref.V-28.missing_link", p0=rec.row, p1=key)))
     for rec in rows:
-        other = machines.get(unkey(rec.get("主键")))
-        if other and other.get("下钻状态") != rec.get("下钻状态"):
-            sink.add_fail("V-28", line("V-28", say("l2_ref.V-28.1", p0=unkey(rec.get('主键')), p1=rec.get('下钻状态'), p2=other.get('下钻状态'))))
+        key = unkey(rec.get("主键"))
+        other = machines.get(key)
+        if other is None:
+            sink.add_fail("V-28", line("V-28", say("l2_ref.V-28.missing_machine", p0=rec.row, p1=key)))
+        elif not ambiguous:
+            if other.get("下钻状态") != rec.get("下钻状态"):
+                sink.add_fail("V-28", line("V-28", say("l2_ref.V-28.1", p0=key, p1=rec.get('下钻状态'), p2=other.get('下钻状态'))))
+            if derived_blocked:
+                continue
+            owner = other.get("主归属功能编号") or DASH
+            identity = functions[owner].get("功能身份") if owner in functions else DASH
+            activities = [row for row in book.logical("表B") if owner in fset(row.get("关联业务功能编号（F-）"))]
+            activity_codes = {row.get("主键") for row in activities}
+            expected = {"主归属功能编号": owner, "功能身份": identity, "关联活动编码": "；".join(sorted(activity_codes)) or DASH}
+            # 流程概要表不在当前读入合同中，不把活动编号前缀当作L4真实性证据。
+            # 优先分支或L4明确为空时可确定；非空L4是否合法交全量语义复核。
+            chain = "不要求" if identity in ("平台功能", "公共能力") else "缺功能" if owner == DASH else "缺活动" if not activities else "缺子流程" if rec.get("所在 L4") in ("", DASH) else None
+            if chain is not None:
+                expected["链路判定"] = chain
+            for column, value in expected.items():
+                actual = rec.get(column, "")
+                # 活动和L4为集合，书写顺序不改变关系，重复项仍不合法。
+                equal = actual == value
+                if column in ("关联活动编码", "所在 L4"):
+                    tokens = fset(actual)
+                    equal = set(tokens) == set(fset(value)) and len(tokens) == len(set(tokens)) and bool(actual)
+                if not equal:
+                    sink.add_fail("V-28", line("V-28", say("l2_ref.V-28.field", p0=rec.row, p1=column, p2=value, p3=actual)))
 
 
 def _v30(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-30", "分摊")
+    if not book.readable(sink, "V-30", '功能'):
+        return
     rows = book.logical("分摊")
     if not rows:
         sink.set_na("V-30", "分摊表的行")
@@ -398,6 +464,7 @@ def _v30(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v36(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-36", "登记簿")
     rows = book.logical("登记簿")
     if not rows:
         sink.set_na("V-36", "能力登记簿的行")
@@ -408,7 +475,7 @@ def _v36(book: WorkbookData, sink: Sink) -> None:
         machine = machines.get(unkey(rec.get("主键")))
         owner = machine.get("主归属功能编号") if machine else DASH
         reasons = []
-        if owner not in functions or functions[owner].get("功能身份") != "业务功能":
+        if book.readable(sink, "V-36", "机能", "功能") and (owner not in functions or functions[owner].get("功能身份") != "业务功能"):
             reasons.append(say("frag.041"))
         users = fset(rec.get("建设期使用方"))
         expect = "潜在共通能力" if len(users) == 1 else "共通能力"
@@ -419,6 +486,7 @@ def _v36(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v40(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-40", "表B")
     rows = book.logical("表B")
     if not rows:
         sink.set_na("V-40", "表 B 的行")
@@ -435,6 +503,11 @@ def _v40(book: WorkbookData, sink: Sink) -> None:
     table = book.tables.get("全局活动清单")
     if wanted and (table is None or not table.present):
         sink.add_fail("V-40", line("V-40", say("l2_ref.V-40.1", p0="、".join(wanted))))
+        return
+    if table and table.blocked:
+        book.readable(sink, "V-40", "清单")
+        return
+    if not book.readable(sink, "V-40", "表A"):
         return
     if table and table.present and table.headers != ["编码", "活动名称", "主归属 L4", "引用 L4", "scope"]:
         sink.add_fail("V-40", line("V-40", say("l2_ref.V-40.2")))

@@ -1,6 +1,6 @@
-# 软件成本建模 0.1.2 安装说明
+# 软件成本建模 0.1.3 安装说明
 
-「软件成本建模」（Cost Modeler）的插件名为 `cost-modeler`，版本 `0.1.2`。正式安装与更新从公开发行仓 `ifoohoo/cost-modeler` 走各宿主官方远端入口，跟踪默认分支 `main`。需要固定某一发布时，使用精确标签，当前为 `cost-modeler-v0.1.2`。钉在标签时，宿主更新命令不会自动改到新标签。正式路径不是手工解压 ZIP，也不是自建 marketplace。
+「软件成本建模」（Cost Modeler）的插件名为 `cost-modeler`，版本 `0.1.3`。正式安装与更新从公开发行仓 `ifoohoo/cost-modeler` 走各宿主官方远端入口，跟踪默认分支 `main`。需要固定某一发布时，使用精确标签，当前为 `cost-modeler-v0.1.3`。钉在标签时，宿主更新命令不会自动改到新标签。正式路径不是手工解压 ZIP，也不是自建 marketplace。
 
 五个入口名称固定：
 
@@ -10,9 +10,24 @@
 - `cost-modeler-setup`：检查业务目录的 Python 环境；得到明确同意后才安装依赖
 - `cost-modeler-quickstart`：一句话分诊到上面某个入口
 
-# 0.1.2 本版更新
+# 0.1.3 本版更新
 
-本版对照活动的业务对象、允许动作和完成状态，核实关联功能的实际用途与结果，防止功能挂错或张冠李戴；也复核功能到机能的实际支撑关系。报告使用预先审核的固定文案，检查时按实际证据选用填写，不重新润色。关键信息缺失时说明待核实内容，不将未建关联或空登记表等同于现实中没有功能。检查不修改工作簿；脚本通过不代表语义复核已完成，仍有疑点、资料不足或未复核范围时，不能宣称整表通过。
+本版补齐了本轮识别的八类检查缺口：
+
+- 表格结构与填写规范
+- 跨表引用与登记完整性
+- 业务关联与拆分合理性
+- 功能身份与证据依据
+- 数据移动及规模与复用计量
+- 成本归集与分摊核算
+- 状态历史与关账约束
+- 业务表达与职责清晰度
+
+语义复核覆盖所有功能，包括未关联行，并核查跨组重复、拆分和漏记。活动与功能按业务对象、动作和状态核对，防止张冠李戴；平台与公共功能身份、数据移动与复用计量、原始投入的完整性和真实性均结合实际证据判断，中文实现词、空话目的和职责权限也纳入复核。
+
+报告采用预先经 Qwen3 优化、逐项语义复核的固定文案，运行时按真实事实选句填写，不临时润色。报告分别说明脚本实际检查范围和模型实际语义复核范围。正常项汇总覆盖范围；同原因资料不足合并列示，保留全部受影响对象和准确坐标；具体发现只摘引必要原文，避免全表抄录。
+
+检查不修改工作簿。脚本通过不代表语义复核完成；仍有疑点、资料不足或未复核范围时，不能宣称整表通过。必要原始材料缺失时，仍按资料不足列出，不将规则补全等同于现实业务事实已全部核实。
 
 # 首次使用与写入边界
 
@@ -79,7 +94,7 @@ claude plugin install cost-modeler@cost-modeler
 claude plugin update cost-modeler@cost-modeler
 ```
 
-官方说明：未开启自动更新时需要手动更新；宿主按插件 `version` 决定是否换成新副本。本包包内 `.claude-plugin/plugin.json` 的 `version` 为 `0.1.2`。固定某一发布时，添加目录写成 `ifoohoo/cost-modeler#cost-modeler-v0.1.2`。
+官方说明：未开启自动更新时需要手动更新；宿主按插件 `version` 决定是否换成新副本。本包包内 `.claude-plugin/plugin.json` 的 `version` 为 `0.1.3`。固定某一发布时，添加目录写成 `ifoohoo/cost-modeler#cost-modeler-v0.1.3`。
 
 # Grok
 
@@ -100,7 +115,7 @@ grok plugin update cost-modeler
 固定某一发布：
 
 ```bash
-grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.2#dist/claude/cost-modeler
+grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.3#dist/claude/cost-modeler
 ```
 
 `plugin install` 的 `<SOURCE>` 支持 Git URL、GitHub shorthand `user/repo`、`@ref` 与 `#subdir`。正常路径直接指向公开仓中的 `dist/claude/cost-modeler`。安装后新开会话，入口以 `/cost-modeler-fill` 这类名称出现。
@@ -135,11 +150,11 @@ codex plugin add cost-modeler@cost-modeler
 固定某一发布：
 
 ```bash
-codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.2
+codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.3
 codex plugin add cost-modeler@cost-modeler
 ```
 
-`owner/repo@ref` 与 `--ref` 等价，例如 `ifoohoo/cost-modeler@cost-modeler-v0.1.2`。
+`owner/repo@ref` 与 `--ref` 等价，例如 `ifoohoo/cost-modeler@cost-modeler-v0.1.3`。
 
 插件装入后，五入口 `SKILL.md` 在 `skills/<入口>/SKILL.md`，包根为插件根。这是路径推论，不是宿主实测。五个入口需要留在整包的 `skills/` 下，才能找到共享 `scripts/` 与文稿。Foundation 宿主描述仍给出技能根 `.agents/skills` 与 `skill-directory-v1`；那条路径带不走共享包根，正式安装走本节 CLI。
 
@@ -178,7 +193,7 @@ https://github.com/ifoohoo/cost-modeler.git
 ```json
 {
   "name": "cost-modeler",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }

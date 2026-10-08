@@ -70,6 +70,7 @@ def run(book: WorkbookData, sink: Sink, opt: Options) -> None:
 
 
 def _required(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-02", "表A", "表B", "补登", "功能", "机能", "明细", "汇总", "链路", "分摊", "登记簿", "不计入", "恒等式", "全系统")
     for rec in book.logical("表A"):
         for column in ("活动名称", "编码", "分工模型"):
             _v02(sink, rec.sheet, rec, column)
@@ -112,7 +113,8 @@ def _required(book: WorkbookData, sink: Sink) -> None:
             )
             _v02(sink, sheet, rec, column, dash_ok=allow_dash)
         _v02(sink, sheet, rec, "FUR 依据", dash_ok=True)
-        _v02(sink, sheet, rec, "触发业务功能编号", _kst(book, rec.get("机能主键", "")) not in ("待下钻", "未登记") and rec.get("归属层级") != "整页级")
+        if book.readable(sink, "V-02", "机能"):
+            _v02(sink, sheet, rec, "触发业务功能编号", _kst(book, rec.get("机能主键", "")) not in ("待下钻", "未登记") and rec.get("归属层级") != "整页级")
         if rec.get("归属层级") == "整页级" or _kst(book, rec.get("机能主键", "")) in ("待下钻", "未登记"):
             _v02(sink, sheet, rec, "触发业务功能编号", dash_ok=True)
         _v02(sink, sheet, rec, "机能主键", rec.get("归属层级") != "整页级")
@@ -155,6 +157,7 @@ def _required(book: WorkbookData, sink: Sink) -> None:
 
 
 def _domain(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-03", "表A", "表B", "补登", "功能", "机能", "明细", "汇总", "链路", "分摊", "登记簿", "不计入", "恒等式", "全系统")
     _domain_table_a(book, sink)
     for rec in book.logical("表B"):
         _v03(sink, rec.sheet, rec, "主归属 / 引用", ["主归属 L4：〈编码〉", "主归属 L4：〈编码〉；引用 L4：〈编码〉"], REF_LINE.fullmatch(rec.get("主归属 / 引用", "")) is not None)
@@ -196,6 +199,8 @@ def _domain(book: WorkbookData, sink: Sink) -> None:
         _v03(sink, rec.sheet, rec, COL_A, ["非负数字"], re.fullmatch(r"\d+(?:\.\d+)?", amount or "") is not None)
     _sequences(book, sink)
     for rec in book.logical("汇总"):
+        _v03(sink, rec.sheet, rec, "下钻状态", list(KST))
+        _v03(sink, rec.sheet, rec, "受益方留痕", [DASH])
         for column in ("列 B 分摊后规模（归集用）", "列一 不复用", "列二 复用"):
             _v03(sink, rec.sheet, rec, column, ["非负数字"], re.fullmatch(r"\d+(?:\.\d+)?", rec.get(column, "") or "") is not None)
     for rec in book.logical("链路"):
@@ -258,7 +263,8 @@ def _domain(book: WorkbookData, sink: Sink) -> None:
         for column in ("实际成本总额", "Σ分摊额", "Σ剔除额"):
             _v03(sink, rec.sheet, rec, column, ["到分的金额"], MONEY.fullmatch(rec.get(column, "") or "") is not None)
         scope = rec.get("范围", "")
-        _v03(sink, rec.sheet, rec, "范围", ["本片合计"] + sorted(l4s), scope == "本片合计" or scope in l4s)
+        if book.readable(sink, "V-03", "表A"):
+            _v03(sink, rec.sheet, rec, "范围", ["本片合计"] + sorted(l4s), scope == "本片合计" or scope in l4s)
         if scope == "本片合计":
             _v03(sink, rec.sheet, rec, "来源证据", ["人工认定：…", "机器导出：…"], re.match(r"(人工认定|机器导出)：\S", rec.get("来源证据", "")) is not None)
         else:
@@ -287,6 +293,7 @@ def _domain_table_a(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v42(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-42", "表A")
     """角色分工风险：多 R、多 A、任务型缺 R/缺 A、会议型缺 O/缺 R/缺 A，全部只预警。
     同一角色格含多个字母（如 `AR`）是合法写法，不进本项。"""
     rows = book.logical("表A")
@@ -371,6 +378,7 @@ def F_OK(value: str) -> bool:
 
 
 def _unique(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-04", "表A", "表B", "补登", "功能", "机能", "明细", "汇总", "链路", "分摊", "登记簿", "不计入", "恒等式", "全系统")
     def uniq(sheet_label, rows, keyfn):
         seen = defaultdict(list)
         for rec in rows:
@@ -404,6 +412,7 @@ def _unique(book: WorkbookData, sink: Sink) -> None:
 
 
 def _keys(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-05", "表A", "表B", "补登", "功能", "机能", "明细", "汇总", "链路", "分摊", "登记簿", "不计入", "恒等式", "全系统")
     cells = []
     for rec in book.logical("机能") + book.logical("汇总") + book.logical("链路") + book.logical("登记簿"):
         cells.append((rec, "主键", rec.get("主键", "")))
@@ -430,6 +439,7 @@ def _keys(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v14(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-14", "功能")
     rows = book.logical("功能")
     if not rows:
         return
@@ -464,6 +474,7 @@ def _v14(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v16(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-16", "机能")
     for rec in book.logical("机能"):
         if rec.get("类型") == DASH:
             if rec.get("下钻状态") != "未登记":
@@ -477,6 +488,7 @@ def _v16(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v17(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-17", "机能")
     for rec in book.logical("机能"):
         if rec.get("类型") == "画面":
             ends = fset(rec.get("端"))
@@ -487,6 +499,7 @@ def _v17(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v18(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-18", "机能")
     for rec in book.logical("机能"):
         if rec.get("类型") != "画面":
             continue
@@ -497,6 +510,7 @@ def _v18(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v22(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-22", "明细")
     rows = book.logical("明细")
     if not rows:
         sink.set_na("V-22", "数据移动明细的行")
@@ -514,7 +528,7 @@ def _v22(book: WorkbookData, sink: Sink) -> None:
         is_screen = machine != DASH and unkey(machine).startswith("画面|")
         if rec.get("数据移动类型") == "X" and (is_screen or shared != DASH) and level != "区块级":
             reasons.append(say("frag.012"))
-        if machine != DASH and unkey(machine) not in known:
+        if machine != DASH and book.readable(sink, "V-22", "机能") and unkey(machine) not in known:
             reasons.append(say("frag.013"))
         if machine != DASH:
             if is_screen and not (level == "区块级" and "只服务：" in rec.get("来源证据", "")):
@@ -526,6 +540,7 @@ def _v22(book: WorkbookData, sink: Sink) -> None:
 
 
 def _v24(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-24", "明细")
     rows = book.logical("明细")
     if not rows:
         sink.set_na("V-24", "数据移动明细的行")
@@ -549,6 +564,7 @@ def _pool_groups(book: WorkbookData):
 
 
 def _v31(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-31", "分摊")
     rows = book.logical("分摊")
     if not rows:
         sink.set_na("V-31", "分摊表的行")
@@ -558,6 +574,8 @@ def _v31(book: WorkbookData, sink: Sink) -> None:
     for rec in rows:
         pool = rec.get("池类型")
         if pool not in ("公共池", "平台池"):
+            continue
+        if not book.readable(sink, "V-31", "机能", "功能"):
             continue
         want = "平台功能" if pool == "平台池" else "公共能力"
         cost = unkey(rec.get("成本池"))
@@ -597,11 +615,12 @@ def _v31(book: WorkbookData, sink: Sink) -> None:
                 sink.add_fail("V-31", line("V-31", say("l1_row.V-31.7", p0=rec.row, p1=driver)))
             if pool == "共享服务池" and driver != "全盘业务 CFP 占比":
                 sink.add_fail("V-31", line("V-31", say("l1_row.V-31.8", p0=rec.row, p1=driver)))
-        if pool == "共享池" and len(group) < 2:
+        if pool == "共享池" and book.readable(sink, "V-31", "分摊") and len(group) < 2:
             sink.add_fail("V-31", line("V-31", say("l1_row.V-31.2", p0=group[0].row, p1=group[0].get('期次'), p2=pool, p3=cost)))
 
 
 def _v32(book: WorkbookData, sink: Sink) -> None:
+    book.readable(sink, "V-32", "分摊")
     rows = [rec for rec in book.logical("分摊") if rec.get("池类型") != "未下钻池" and rec.get("动因") in ("等分（降级口径）", "CFP 消费占比")]
     if not rows:
         sink.set_na("V-32", "要查等分或消费占比证据的行")

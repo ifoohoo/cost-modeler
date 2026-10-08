@@ -133,6 +133,26 @@ class WorkbookData:
     def logical(self, key: str) -> list[Rec]:
         return self.by_logical.get(key, [])
 
+    def readable(self, sink, code: str, *keys: str) -> bool:
+        """查当前领域输入是否可读；分表正文缺失不能代表总量为零。"""
+        from .messages import line, say
+        blocked = []
+        for key in keys:
+            name = LOGICAL_SHEET[key]
+            names = [name]
+            if key in ("分摊", "恒等式"):
+                names += [item for item in self.tables if item.startswith(name + "·")]
+            for item in names:
+                table = self.tables.get(item)
+                # 未要求的可选表缺席由调用方按业务条件处理。
+                if table is not None and table.blocked:
+                    blocked.append(item)
+        if blocked:
+            text = line(code, say("check.blocked", p0="、".join(dict.fromkeys(blocked))))
+            if text not in sink.unable.get(code, []):
+                sink.set_unable(code, text)
+        return not blocked
+
 
 def _expected_headers(sheet_name: str) -> list[str] | None:
     if sheet_name in HEADERS:

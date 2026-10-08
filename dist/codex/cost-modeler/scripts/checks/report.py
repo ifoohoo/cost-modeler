@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from .messages import na_line
+from .messages import na_line, say
 from .model import CHECK_ORDER, Options, Sink
 from .report_text import phrase
 from .textutil import pct_text
@@ -21,15 +21,15 @@ def build(sink: Sink, opt: Options, filename: str, when: datetime) -> tuple[str,
         fails = sink.fail.get(code, [])
         warns = sink.warn.get(code, [])
         unable = sink.unable.get(code, [])
+        unable_lines.extend(unable)
+        warn_lines.extend(warns)
         if fails:
             status = "判不过"
             fail_n += 1
             fail_lines.extend(fails)
-            warn_lines.extend(warns)
         elif unable:
             status = "无法校验"
             unable_n += 1
-            unable_lines.extend(unable)
         elif code in sink.skip:
             status = "不适用"
             na_n += 1
@@ -41,7 +41,6 @@ def build(sink: Sink, opt: Options, filename: str, when: datetime) -> tuple[str,
         else:
             status = "通过"
             pass_n += 1
-            warn_lines.extend(warns)
         rows.append((code, status))
     warn_n = len(warn_lines)
     if fail_n:
@@ -102,4 +101,8 @@ def build(sink: Sink, opt: Options, filename: str, when: datetime) -> tuple[str,
         "\n".join(na_lines) if na_lines else empty,
         "",
     ]
+    if any(sink.fail.get(code) and sink.unable.get(code) for code in CHECK_ORDER):
+        body.insert(body.index(phrase("conclusion_line").format(conclusion=conclusion)) + 1, say("report.mixed"))
+    if opt.validation_date is not None:
+        body.insert(6, say("report.date", p0=opt.validation_date.isoformat()))
     return "\n".join(body), conclusion, exit_code
