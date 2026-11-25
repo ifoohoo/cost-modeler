@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """填写引导。
 
+<!-- @feature CM3 -->
+
 --dump 只读指定表的指定行：列名、该列填写说明、格子里已有的字。
 不决定问什么，也不打开别的表。
 --write 把已经推出的列文字写入该行还空着的格子。不推导，不覆盖已填内容。
@@ -526,6 +528,23 @@ def dump_row(workbook: Path, sheet: str, row: int) -> dict:
         wb.close()
 
 
+def _row_bounds_error(ws, sheet: str, row: int) -> dict | None:
+    """校验行号严格位于表头说明行之下、教学示例分隔行之上。"""
+    from checks.load import _find_separator
+
+    help_row = 4 if sheet == TABLE_A_SHEET else 3
+    if row <= help_row:
+        return {"kind": "error", "message": "这一行是表头或填写说明，不写入"}
+    separator_row = _find_separator(ws, ws.max_column or 1)
+    if separator_row is None:
+        return {"kind": "error", "message": "缺少「以下为教学案例示例」分隔行，无法确定可写数据区"}
+    if row == separator_row:
+        return {"kind": "error", "message": "这一行是示例分隔，不写入"}
+    if row > separator_row:
+        return {"kind": "error", "message": "这一行位于示例分隔行下方教学示例区，不写入"}
+    return None
+
+
 def write_cells(workbook: Path, sheet: str, row: int, cells: dict) -> dict:
     """把已经推出的文字写入该行还空着的格子。不推导，不覆盖。"""
     from openpyxl import load_workbook
@@ -540,13 +559,10 @@ def write_cells(workbook: Path, sheet: str, row: int, cells: dict) -> dict:
             return {"kind": "error", "message": "工作簿没有这张表"}
         if sheet in READONLY_SHEETS:
             return {"kind": "stop", "sheet": sheet, "row": row, "cells": [], "skipped": []}
-        help_row = 4 if sheet == TABLE_A_SHEET else 3
-        if row <= help_row:
-            return {"kind": "error", "message": "这一行是表头或填写说明，不写入"}
         ws = wb[sheet]
-        first = ws.cell(row, 1).value
-        if isinstance(first, str) and first.startswith("以下为教学案例示例"):
-            return {"kind": "error", "message": "这一行是示例分隔，不写入"}
+        bounds_error = _row_bounds_error(ws, sheet, row)
+        if bounds_error is not None:
+            return bounds_error
         headers = {name: col for col, name in _header_pairs(ws, sheet)}
         missing = [name for name in cells if name not in headers]
         if missing:
@@ -598,6 +614,7 @@ def inspect_row(workbook: Path, sheet: str, row: int) -> dict:
                 "derived": [],
             }
         ws = wb[sheet]
+        row_writable = (sheet == SHEET_B_SHEET) and (_row_bounds_error(ws, sheet, row) is None)
         say = _sayings() if sheet == SHEET_B_SHEET else {}
         known: list[dict] = []
         ask: list[dict] = []
@@ -631,7 +648,7 @@ def inspect_row(workbook: Path, sheet: str, row: int) -> dict:
                 "kind": "ask",
                 "sheet": sheet,
                 "row": row,
-                "writable": sheet == SHEET_B_SHEET,
+                "writable": row_writable,
                 "column": first["column"],
                 "question": first["question"],
                 "known": known,
@@ -645,7 +662,7 @@ def inspect_row(workbook: Path, sheet: str, row: int) -> dict:
             "kind": "context",
             "sheet": sheet,
             "row": row,
-            "writable": sheet == SHEET_B_SHEET,
+            "writable": row_writable,
             "known": known,
             "ask": [],
             "derived": derived,
@@ -680,21 +697,21 @@ def apply_row(workbook: Path, sheet: str, row: int, updates: dict) -> dict:
             "kind": "error",
             "message": "只能提交现场事实，不能直接写列：" + "、".join(foreign),
         }
-    derived = guide(updates)
-    if derived["kind"] != "fill":
-        refused = dict(derived)
-        refused["sheet"] = sheet
-        refused["row"] = row
-        refused["cells"] = []
-        return refused
     wb = load_workbook(workbook)
     try:
         if sheet not in wb.sheetnames:
             return {"kind": "error", "message": "工作簿没有这张表"}
         ws = wb[sheet]
-        first = ws.cell(row, 1).value
-        if isinstance(first, str) and first.startswith("以下为教学案例示例"):
-            return {"kind": "error", "message": "这一行是示例分隔，不写入"}
+        bounds_error = _row_bounds_error(ws, sheet, row)
+        if bounds_error is not None:
+            return bounds_error
+        derived = guide(updates)
+        if derived["kind"] != "fill":
+            refused = dict(derived)
+            refused["sheet"] = sheet
+            refused["row"] = row
+            refused["cells"] = []
+            return refused
         headers = {name: col for col, name in _header_pairs(ws, sheet)}
         missing = [item["column"] for item in derived["cells"] if item["column"] not in headers]
         if missing:
@@ -733,33 +750,35 @@ def _emit(result: dict) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="按指定的表和行读格子，或把已经推出的空格子写上")
-    parser.add_argument("--facts", type=Path, help="JSON 对象，键是事实名，值是现场回答")
-    parser.add_argument("--workbook", type=Path, help="要读或写的工作簿")
-    parser.add_argument("--sheet", help="表名")
-    parser.add_argument("--row", type=int, help="行号，从 1 起")
-    parser.add_argument("--dump", action="store_true", help="只读这一行的列名、填写说明和已有的字")
-    parser.add_argument("--write", type=Path, help="列名到文字的 JSON。只写还空着的格子")
-    parser.add_argument("--apply", type=Path, help="现场事实 JSON。只把由此推出的空表 B 格子写入")
+    parser = argparse.ArgumentParser(
+        description="按指定工作表与行读取现有内容（--dump），或将已由事实推导确定的值写入空白单元格（--write / --apply）"
+    )
+    parser.add_argument("--facts", type=Path, help="离线表 B 现场事实 JSON 文件（键为事实名，值为现场回答，不打开工作簿）")
+    parser.add_argument("--workbook", type=Path, help="待读取或写入空白格的业务工作簿（.xlsx）路径")
+    parser.add_argument("--sheet", help="目标工作表名称")
+    parser.add_argument("--row", type=int, help="目标数据行号（从 1 开始计数）")
+    parser.add_argument("--dump", action="store_true", help="只读返回指定行的列名、填写说明与当前单元格内容")
+    parser.add_argument("--write", type=Path, help="列名到待写文本的 JSON 文件路径；仅写入空白单元格，绝不覆盖已有内容")
+    parser.add_argument("--apply", type=Path, help="表 B 现场事实 JSON 文件路径；推导后仅写入表 B 的空白单元格")
     args = parser.parse_args(argv)
     if args.facts and (args.workbook or args.dump or args.write or args.apply):
-        print("事实推导和按行处理不要同时用", file=sys.stderr)
+        print("参数冲突：--facts（纯事实离线推导）不能与 --workbook / --dump / --write / --apply（按行读写工作簿）同时传入", file=sys.stderr)
         return 2
     if args.dump and (args.write or args.apply):
-        print("读取和写入不要同时用", file=sys.stderr)
+        print("参数冲突：--dump（只读单行）不能与 --write 或 --apply（写入空白格）同时传入", file=sys.stderr)
         return 2
     if args.write and args.apply:
-        print("两种写入不要同时用", file=sys.stderr)
+        print("参数冲突：--write 与 --apply 分属两种写入方式，请只保留其中一种", file=sys.stderr)
         return 2
     if args.facts:
         facts = json.loads(args.facts.read_text(encoding="utf-8"))
         if not isinstance(facts, dict):
-            print("事实文件必须是一个 JSON 对象", file=sys.stderr)
+            print("参数格式错误：--facts 指向的文件内容必须是 JSON 对象（键值映射）", file=sys.stderr)
             return 2
         return _emit(run_facts(facts))
     if args.workbook:
         if not args.sheet or not args.row:
-            print("按行处理需要表名和行号", file=sys.stderr)
+            print("缺少必填参数：传入 --workbook 按行处理时，必须同时提供 --sheet <表名> 和 --row <行号>", file=sys.stderr)
             return 2
         if args.dump:
             return _emit(dump_row(args.workbook, args.sheet, args.row))
@@ -770,7 +789,7 @@ def main(argv: list[str] | None = None) -> int:
             updates = json.loads(args.apply.read_text(encoding="utf-8"))
             return _emit(apply_row(args.workbook, args.sheet, args.row, updates))
         return _emit(inspect_row(args.workbook, args.sheet, args.row))
-    print("需要事实文件，或工作簿、表名和行号", file=sys.stderr)
+    print("缺少输入参数：请传入 --facts <事实文件.json>，或同时传入 --workbook <工作簿> --sheet <表名> --row <行号>", file=sys.stderr)
     return 2
 
 

@@ -583,9 +583,6 @@ def _v31(book: WorkbookData, sink: Sink) -> None:
             machine = machines.get(cost)
             owner = machine.get("主归属功能编号") if machine else DASH
             if not machine or owner not in functions or functions[owner].get("功能身份") != want:
-                sink.add_fail("V-31", line("V-31", say("l1_row.V-31.3", p0=rec.row, p1=pool, p2=rec.get('动因'))))
-                # 身份不对用同一处理口径里的「该行不合格」，问题句改回身份。
-                sink.fail["V-31"].pop()
                 sink.add_fail("V-31", line("V-31", say("l1_row.V-31.4", p0=rec.row, p1=pool, p2=want)))
         elif F_OK(cost):
             if cost not in functions or functions[cost].get("功能身份") != want or any(item.get("主归属功能编号") == cost for item in book.logical("机能")):

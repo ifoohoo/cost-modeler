@@ -1,43 +1,41 @@
 ---
 name: cost-modeler-help
-description: 说明成本核算表格技能族能做哪两件事、各自停在哪里，以及该去哪个入口。
+description: 说明软件成本建模技能族能做哪两项工作、各自的读写边界，以及应当进入哪个入口。
 user-invocable: true
 ---
+<!-- @feature CM4 -->
 
-# 成本核算表格技能族说明
+# 软件成本建模技能族说明
 
-已加载的 `SKILL.md` 位于 `skills/<入口名>/SKILL.md`，包根是 `skills/` 的上一级目录。下文用 `<plugin-root>`（即命令中的 `〈包根〉`）表示这个真实包根；使用前从当前加载的技能路径确定它，并替换为实际绝对路径，不把它当作系统已有环境变量。共享脚本是 `<plugin-root>/scripts/validate.py` 和 `<plugin-root>/scripts/fill_guide.py`；docs、references、templates 和 examples 是同一包根下的目录。用户工作簿、`.venv` 和报告仍写在业务目录。不要把当前工作目录当成包根，也不要使用开发机上的固定绝对路径。
+若当前加载的 `SKILL.md` 位于 `skills/<入口名>/SKILL.md`，`skills/` 的上一级目录即为真实包根；若从工作区 `.agents/skills/<入口名>/SKILL.md` 加载，`.agents/` 的上一级目录即为真实包根（下文记作 `<plugin-root>` 或命令中的 `〈包根〉`，共享入口为 `<plugin-root>/scripts/validate.py` 与 `<plugin-root>/scripts/fill_guide.py`）。调用共享脚本前，请先从当前 `SKILL.md` 路径推导并替换为真实绝对路径，不要把它当作系统预置环境变量，也不要用当前工作目录代替包根。scripts、docs、references、templates 和 examples 目录均位于包根下；用户工作簿、`.venv` 与报告保存在用户业务目录中。
 
+## 核心能力与入口分工
 
-这个族做两件事。
+本技能族围绕《成本核算表格模板（v2）》承担两项业务工作：
 
-- 检查：读一份按《成本核算表格模板》填好的工作簿，用 `validate.py` 从 V-00 到 V-42 出报告。结论是「通过」、「判不过」或「无法出结论」。预警、无法校验、不适用另列。判定、编号和金额由检查程序决定。
-- 填写引导：人点名一张表的一行，或还不会填时，走 `cost-modeler-fill`。先检索文稿，再顺着文稿写明的关联读对应行，一次只问一句还缺的现场事实，并写入已经推出的空格子。
+- **工作簿校验（`cost-modeler-validate`）**：先运行 `validate.py` 完成 `V-00` 至 `V-42` 的确定规则检查（总体结论分为「通过」「判不过」或「无法出结论」，预警、无法校验与不适用单列，编号和金额均由脚本精确重算），再由当前会话结合方法论完成全量业务语义复核。
+- **按事实填写引导（`cost-modeler-fill`）**：针对用户指定的表格与行（或列），先检索方法论文稿并读取关联行，每次只追问一项还缺的现场事实，推导并写入可确定的空白单元格。
 
-说明入口有三个：本说明、环境检查 `cost-modeler-setup`，以及不确定该用哪个时的 `cost-modeler-quickstart`。两项工作的入口是 `cost-modeler-validate`（检查）和 `cost-modeler-fill`（填写引导）。熟悉之后可以直接去这两个入口。
+除上述两个业务入口外，另提供三个辅助入口：本说明 `cost-modeler-help`、运行环境检查 `cost-modeler-setup`、以及一句话分诊 `cost-modeler-quickstart`。熟悉分工后可直接调用 `cost-modeler-validate` 或 `cost-modeler-fill`。
 
-## 依赖和最小例子
+## 环境依赖与最小命令示例
 
-跑检查或填写，需要项目根目录下的 `.venv`，并且这个环境能导入 openpyxl。环境不齐时去 `cost-modeler-setup`。它只检查并给出计划，未经同意不安装，也不因为有新版本就更换已经能用的 openpyxl。
+执行校验或填写引导前，目标业务目录下需具备可导入 `openpyxl` 的 `.venv` 虚拟环境。若环境尚未就绪，可先运行 `cost-modeler-setup`（仅诊断并打印计划，未经明确同意绝不安装，也不会擅自升级已可用的 `openpyxl`）。
 
-检查一份工作簿：
+只读校验一份工作簿：
 
 ```bash
 〈业务目录〉/.venv/bin/python 〈包根〉/scripts/validate.py 〈工作簿.xlsx〉 -o 〈业务目录〉/work/cost-modeler/报告.md
 ```
 
-填写某一行时，打开 `cost-modeler-fill`，按那里的检索回合做。读取指定行：
+读取指定行的列名、填写说明与现有内容（配合 `cost-modeler-fill` 流程）：
 
 ```bash
 〈业务目录〉/.venv/bin/python 〈包根〉/scripts/fill_guide.py --dump --workbook 〈工作簿.xlsx〉 --sheet 〈表名〉 --row 〈行号〉
 ```
 
-命令失败、找不到解释器，或 openpyxl 导入失败时，先看 setup 打出的缺项。不知道该检查还是填写时，用 quickstart，由它说明差别。工作簿和报告只在本机读写，本入口不把表格发到别处。
+## 语义与安全边界
 
-## 能力边界
-
-本入口只作说明，不读工作簿，不改文件，不安装，不联网。
-
-检查不改工作簿。填写引导不写表 A、说明、整页由机器生成的表和链路核对视图，不覆盖已经写过的格子，也不代替检查下结论。这两件事都不调用别的技能。
-
-各入口的范围见 `<plugin-root>/references/能力边界.md`。填写怎么检索、怎么问、怎么写，见 `cost-modeler-fill`。
+- 本入口仅提供能力说明，不读取工作簿、不修改文件、不安装依赖、不连接网络。
+- 工作簿校验全程只读；填写引导不写 `表 A 活动明细表`、`说明`、`整页级份额（机器执行）` 与 `链路核对视图`，绝不覆盖已有内容，也不替代校验出具验收结论。
+- 各入口详细边界见 `<plugin-root>/references/能力边界.md`。

@@ -1,221 +1,152 @@
-# 软件成本建模 0.1.3 安装说明
+# 软件成本建模（Cost Modeler）0.1.4 安装与使用指南
 
-「软件成本建模」（Cost Modeler）的插件名为 `cost-modeler`，版本 `0.1.3`。正式安装与更新从公开发行仓 `ifoohoo/cost-modeler` 走各宿主官方远端入口，跟踪默认分支 `main`。需要固定某一发布时，使用精确标签，当前为 `cost-modeler-v0.1.3`。钉在标签时，宿主更新命令不会自动改到新标签。正式路径不是手工解压 ZIP，也不是自建 marketplace。
+插件标识为 `cost-modeler`（中文名：**软件成本建模**），当前版本 `0.1.4`。正式安装与升级通过公开发行仓库 `ifoohoo/cost-modeler` 的各宿主官方远端入口完成，默认跟踪 `main` 分支；如需锁定特定版本，请指定不可变 Git 标签 `cost-modeler-v0.1.4`（锁定标签后宿主更新命令不会自动切往新标签）。
 
-五个入口名称固定：
+本技能族固定提供五个入口：
 
-- `cost-modeler-validate`：检查已填工作簿的填写规范与业务关联
-- `cost-modeler-fill`：按现场事实填写还空着的格子
-- `cost-modeler-help`：说明这两类能力停在哪里
-- `cost-modeler-setup`：检查业务目录的 Python 环境；得到明确同意后才安装依赖
-- `cost-modeler-quickstart`：一句话分诊到上面某个入口
+- `cost-modeler-validate`：检查已填写工作簿的填写规范、跨表一致性与业务合理性
+- `cost-modeler-fill`：围绕用户指定的表格与行，按现场事实推导并填写空白单元格
+- `cost-modeler-help`：说明本技能族的能力范围、入口分工与读写边界
+- `cost-modeler-setup`：诊断业务目录的 Python 虚拟环境；仅在获明确同意后安装依赖
+- `cost-modeler-quickstart`：将一句话需求分诊到对应入口
 
-# 0.1.3 本版更新
+## 能力体系与验收边界
 
-本版补齐了本轮识别的八类检查缺口：
+`cost-modeler-validate` 覆盖八类检查范围：表格结构与填写规范、跨表引用与登记完整性、业务关联与拆分合理性、功能身份与证据依据、数据移动及规模与复用计量、成本归集与分摊核算、状态历史与关账约束、业务表达与职责清晰度。
 
-- 表格结构与填写规范
-- 跨表引用与登记完整性
-- 业务关联与拆分合理性
-- 功能身份与证据依据
-- 数据移动及规模与复用计量
-- 成本归集与分摊核算
-- 状态历史与关账约束
-- 业务表达与职责清晰度
+- **确定规则与语义复核分层**：先由只读脚本执行结构、必填、引用和金额重算检查，再由当前会话结合方法论与双端正文全量复核活动、功能、机能、计量、原始投入和角色职责。
+- **固定报告口径**：报告使用经审核的预置文案并填入真实坐标与必要摘录，分别交代脚本检查范围与模型语义复核范围；正常对象合并列示，同原因资料不足归并定位，不抄录整本表格。
+- **通过条件严格受控**：校验全程不修改工作簿。脚本退出码为 `0` 仅代表确定规则通过；只要语义复核未完成、存在语义疑点或缺少必要原始材料，均不能宣称整表通过。
 
-语义复核覆盖所有功能，包括未关联行，并核查跨组重复、拆分和漏记。活动与功能按业务对象、动作和状态核对，防止张冠李戴；平台与公共功能身份、数据移动与复用计量、原始投入的完整性和真实性均结合实际证据判断，中文实现词、空话目的和职责权限也纳入复核。
+## 首次使用与写入边界
 
-报告采用预先经 Qwen3 优化、逐项语义复核的固定文案，运行时按真实事实选句填写，不临时润色。报告分别说明脚本实际检查范围和模型实际语义复核范围。正常项汇总覆盖范围；同原因资料不足合并列示，保留全部受影响对象和准确坐标；具体发现只摘引必要原文，避免全表抄录。
+安装完成后，可先在宿主会话中发起如下只读请求了解边界：
 
-检查不修改工作簿。脚本通过不代表语义复核完成；仍有疑点、资料不足或未复核范围时，不能宣称整表通过。必要原始材料缺失时，仍按资料不足列出，不将规则补全等同于现实业务事实已全部核实。
-
-# 首次使用与写入边界
-
-安装后，可以先在会话中提出这个请求：
 ```text
 请调用 cost-modeler-help，说明软件成本建模能做什么、不能做什么，暂不读取或修改工作簿。
 ```
-`cost-modeler-help` 只说明能力，不读取工作簿、不修改文件，也不执行安装或联网工具。上面是会话请求示例，不是终端命令；入口的具体调用方式由宿主决定。宿主大模型对话的数据处理仍遵循所用宿主的政策。
+
+`cost-modeler-help` 仅输出能力说明，不读取工作簿、不改动文件，也不执行安装或联网操作（以上为会话提示示例，具体唤醒语法依所用宿主而定）。
 
 <!-- release-skill:capability:safe-first-command -->
 
-- **`cost-modeler-validate`** 先由脚本完成表结构、必填项、引用一致性与计算等确定规则检查，再由当前会话结合方法论与关联双方实际正文，复核活动与业务功能、业务功能与机能的匹配关系。检查只读，报告输出至用户指定的业务目录。
-- **`cost-modeler-fill`** 仅填充空白单元格，**绝不覆盖已有值**，按已确认的现场事实，在用户点名的表格和行范围内执行；事实不足的格子保留空白。
-- **`cost-modeler-setup`** 先做环境检查；需要安装时先输出计划。**必须获得用户明确同意后**，才创建或复用 `.venv` 并安装`openpyxl` `3.1.5`；缺少可用 Python 解释器时先说明前提，不承诺自动安装解释器。
-- 插件安装与更新由宿主从 GitHub 远端完成，需要联网。
+- **`cost-modeler-validate`**：全程只读工作簿，将确定规则报告、`prefilter.json` 与 `association-context.json` 输出到用户指定的业务目录。
+- **`cost-modeler-fill`**：仅在用户点名的可写表和行内填写空白单元格，**绝不覆盖已有内容**；条件尚未由同对象同状态事实证实时保留空白。
+- **`cost-modeler-setup`**：先检查环境并展示三步计划；**必须经用户明确同意后**，才在业务目录创建或复用 `.venv` 并安装 `openpyxl` `3.1.5`（已可用版本保持不动，缺少系统 Python 解释器时仅提示前提，不代装解释器）。
+- 插件自身的安装与更新由宿主从 GitHub 远端拉取，需要网络连接；日常业务校验与填写完全在本机完成。
 
 <!-- release-skill:capability:external-write-boundary -->
 
-**故障排查**：
+**常见故障排查**：
 
-- 若入口未出现，请先核对宿主插件安装状态，并重启会话。
-- 若提示缺少 Python 解释器或 `openpyxl==3.1.5`，请调用 `cost-modeler-setup` 检查指定业务目录，根据实际诊断结果获取安装计划，经确认后执行。
+- 若会话中看不到技能入口，请核对宿主插件启用状态并重开会话。
+- 若运行脚本提示缺少 Python 解释器或无法导入 `openpyxl==3.1.5`，请对目标业务目录调用 `cost-modeler-setup` 获取环境计划，确认后执行。
+- 五个入口位于 `skills/<入口名>/SKILL.md`（工作区自动发现投影位于 `.agents/skills/<入口名>/SKILL.md`）：从 `skills/` 加载时取 `skills/` 上一级作为 `〈包根〉`，从 `.agents/skills/` 加载时取 `.agents/` 上一级作为 `〈包根〉`，以此定位共享的 `scripts/`、`docs/`、`references/`、`templates/` 与 `examples/`；请完整安装插件包，切勿只单独复制 `skills/` 子目录。
 
-五个入口是 `skills/<入口>/SKILL.md`。运行时从实际加载的 `SKILL.md` 确定包根（`skills/` 的上一级），再找 `scripts/`、`docs/`、`references/`、`templates/`、`examples/`。用户工作簿、`.venv` 和校验报告写在业务目录，不写进安装包。只把五个入口文件夹拷进技能根，脚本和文稿会找不到。
+## 多宿主安装方式速览
 
-业务解释器需要能导入 `openpyxl` `3.1.5`。构建用的 Node 不是填写工作簿的运行时。
-
-| 宿主 | 正常安装（跟踪 `main`） |
-|---|---|
-| Claude Code | 添加目录 `ifoohoo/cost-modeler`，安装 `cost-modeler@cost-modeler` |
+| 宿主环境 | 默认安装方式（跟踪 `main`） |
+| --- | --- |
+| Claude Code | 添加市场 `ifoohoo/cost-modeler`，安装 `cost-modeler@cost-modeler` |
 | Grok | `grok plugin install ifoohoo/cost-modeler#dist/claude/cost-modeler` |
-| Codex | 添加目录 `ifoohoo/cost-modeler`，安装 `cost-modeler@cost-modeler` |
+| OpenAI Codex | 添加市场 `ifoohoo/cost-modeler`，安装 `cost-modeler@cost-modeler` |
 | WorkBuddy | 插件页添加 `https://github.com/ifoohoo/cost-modeler.git`，安装 `cost-modeler` |
+| Google Antigravity | 插件根目录提供 `plugin.json` 与 `.agents/skills/`（克隆或复制到插件目录即用） |
 
-Grok 不在 Foundation `0.23.0` 的 host registry，不另造 `grok` hostId，与 Claude Code 使用同一份包 `dist/claude/cost-modeler/`。本次线上安装与更新流程未实测，不把官方文档或本机帮助写成实测通过。迁移已在 Grok 上实际加载新包完成业务填写，那次验证仍然保留，不表示四宿主安装均已实测。本仓三个目录文件是官方允许的仓库级安装入口，不是向第三方公共插件目录投稿。
+> 说明：Foundation `0.23.0` 宿主注册表未单独定义 `grok` `hostId`，Grok 与 Claude Code 直接共用 `dist/claude/cost-modeler/` 插件包（已在 Grok 环境实测加载并完成业务填写；其余宿主的线上远端拉取命令按各宿主官方文档与 CLI 帮助整理，公开仓根目录市场清单仅作本仓库安装入口）。Antigravity 同步读取公开仓库根目录 `plugin.json`、`skills/` 与工作区 `.agents/skills/`。
 
-# Claude Code
+### 1. Claude Code
 
-需要已安装 Claude Code。公开仓仓库根提供 `.claude-plugin/marketplace.json`，插件相对路径 `./dist/claude/cost-modeler`。
-
-在会话中添加目录并安装：
-
-```
-/plugin marketplace add ifoohoo/cost-modeler
-/plugin install cost-modeler@cost-modeler
-```
-
-终端等价命令：
+公开仓库根提供 `.claude-plugin/marketplace.json`（指向 `./dist/claude/cost-modeler`）。在会话或终端中执行：
 
 ```bash
 claude plugin marketplace add ifoohoo/cost-modeler
 claude plugin install cost-modeler@cost-modeler
 ```
 
-更新已添加的目录（自动更新默认关闭）：
-
-```
-/plugin marketplace update cost-modeler
-```
-
-或在终端：
+手动刷新与更新（默认未开启自动更新时）：
 
 ```bash
 claude plugin update cost-modeler@cost-modeler
 ```
 
-官方说明：未开启自动更新时需要手动更新；宿主按插件 `version` 决定是否换成新副本。本包包内 `.claude-plugin/plugin.json` 的 `version` 为 `0.1.3`。固定某一发布时，添加目录写成 `ifoohoo/cost-modeler#cost-modeler-v0.1.3`。
+如需锁定版本，添加市场时使用 `ifoohoo/cost-modeler#cost-modeler-v0.1.4`。
 
-# Grok
-
-与 Claude Code 使用同一份包。本机已核对该帮助的 CLI 为 `1.0.46`。不宣称未核对该组子命令的版本可用。
-
-正常安装：
+### 2. Grok（核对 CLI `1.0.46`）
 
 ```bash
+# 默认安装与更新
 grok plugin install ifoohoo/cost-modeler#dist/claude/cost-modeler
-```
-
-更新已安装插件：
-
-```bash
 grok plugin update cost-modeler
+
+# 锁定特定发布标签
+grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.4#dist/claude/cost-modeler
 ```
 
-固定某一发布：
+安装后新开会话即可使用 `/cost-modeler-fill`、`/cost-modeler-validate` 等入口。
+
+### 3. OpenAI Codex（核对 `codex-cli 0.154.0`）
+
+公开仓库根提供 `.agents/plugins/marketplace.json`（`source.path` 为 `./dist/codex/cost-modeler`，内含 `.codex-plugin/plugin.json` 与完整共享资源，添加市场时无需加 `--sparse`）：
 
 ```bash
-grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.3#dist/claude/cost-modeler
-```
-
-`plugin install` 的 `<SOURCE>` 支持 Git URL、GitHub shorthand `user/repo`、`@ref` 与 `#subdir`。正常路径直接指向公开仓中的 `dist/claude/cost-modeler`。安装后新开会话，入口以 `/cost-modeler-fill` 这类名称出现。
-
-# Codex
-
-兼容范围：本机已核对该帮助的 CLI 为 `codex-cli 0.154.0`。不宣称更早或未核对该组子命令的版本可用。本次线上安装流程未实测。
-
-公开仓仓库根提供 `.agents/plugins/marketplace.json`。`source.path` 相对 marketplace 根，值为 `./dist/codex/cost-modeler`，以 `./` 开头。该目录已有 `.codex-plugin/plugin.json` 以及共享 `skills/`、`scripts/`、`docs/`、`references/`、`templates/`、`examples/`。
-
-正常安装（跟踪 `main`）：
-
-```bash
+# 默认安装（跟踪 main）
 codex plugin marketplace add ifoohoo/cost-modeler
 codex plugin add cost-modeler@cost-modeler
-```
 
-刷新已配置源的快照：
-
-```bash
+# 刷新源快照并更新已装插件
 codex plugin marketplace upgrade cost-modeler
-```
+codex plugin add cost-modeler@cost-modeler
 
-`upgrade` 只刷新当前已配置 Git 源的快照，不会把已安装插件换成新副本。要从刷新后的目录安装当前插件，再执行：
-
-```bash
+# 锁定特定发布标签
+codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.4
 codex plugin add cost-modeler@cost-modeler
 ```
 
-正常路径配置的是 `main`，因此源刷新的是 `main` 上的目录。钉在旧标签时，源刷新仍停在该标签。这是帮助原文推论，不是实测。插件路径已写在目录文件里，添加目录时不加 `--sparse`。
+### 4. WorkBuddy
 
-固定某一发布：
+公开仓库根提供 `.codebuddy-plugin/marketplace.json`（指向实际包根 `./dist/workbuddy/cost-modeler/plugins/cost-modeler`）。在 WorkBuddy 插件页面点击 `+` 添加仓库地址：
 
-```bash
-codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.3
-codex plugin add cost-modeler@cost-modeler
-```
-
-`owner/repo@ref` 与 `--ref` 等价，例如 `ifoohoo/cost-modeler@cost-modeler-v0.1.3`。
-
-插件装入后，五入口 `SKILL.md` 在 `skills/<入口>/SKILL.md`，包根为插件根。这是路径推论，不是宿主实测。五个入口需要留在整包的 `skills/` 下，才能找到共享 `scripts/` 与文稿。Foundation 宿主描述仍给出技能根 `.agents/skills` 与 `skill-directory-v1`；那条路径带不走共享包根，正式安装走本节 CLI。
-
-# WorkBuddy
-
-需要已安装 WorkBuddy。公开仓仓库根提供 `.codebuddy-plugin/marketplace.json`，插件相对路径 `./dist/workbuddy/cost-modeler/plugins/cost-modeler`（实际包根，含 `skills/`、`scripts/` 等，不指向 ZIP 外层）。
-
-在插件页面点 +，输入市场地址：
-
-```
+```text
 https://github.com/ifoohoo/cost-modeler.git
 ```
 
-浏览并安装 `cost-modeler`。更新走已安装插件管理中的更新。用户已确认该宿主可以添加 GitHub 插件源；本包未做安装实测。
+随后在列表中安装 `cost-modeler`，后续升级通过已安装插件管理界面执行。
 
-固定某一发布时，在宿主支持的前提下改用精确标签对应的源；本说明不把标签写成界面里尚未核证的必填项。正常路径使用正式发布维护的 `main`。
+### 5. Google Antigravity
 
-# 放到宿主之后第一次做业务
+公开仓库根提供官方白名单 `plugin.json`、`skills/` 以及工作区自动发现目录 `.agents/skills/`：
 
-装完后，工作簿、虚拟环境和校验报告都在用户自己的业务目录。包根是 `skills/` 的上一级，写作 `〈包根〉`。
+- **全局插件目录安装**：将完整仓库（含根 `plugin.json` 与 `skills/`）克隆或复制到 `~/.gemini/config/plugins/cost-modeler/`，重启会话即可发现五个技能入口。
+- **工作区自动发现**：若当前工程目录包含 `.agents/skills/cost-modeler-*/SKILL.md`（同步保留 `scripts/`、`docs/`、`references/`、`templates/` 与 `examples/`），Antigravity 会话会自动发现并加载五个技能。
 
-在业务目录检查环境：
+## 安装后在业务目录开展工作
+
+用户的工作簿、`.venv` 虚拟环境与校验报告均保存在用户自己的业务目录中，不写回插件包目录：
 
 ```bash
 〈业务目录〉/.venv/bin/python 〈包根〉/scripts/setup_check.py --root 〈业务目录〉
 ```
 
-缺解释器或不能导入 `openpyxl` 时，`cost-modeler-setup` 只打印计划，等人明确同意后才在该业务目录创建或复用 `.venv` 并安装 `openpyxl` `3.1.5`。已经能导入的版本保持不动，不因为有新版本就更换。
+新建核算工作簿可从随包模板 `〈包根〉/templates/成本核算表格模板-v2.xlsx` 起步；`〈包根〉/examples/` 仅提供教学演示样本，请勿把开发工作区或测试夹具当作日常业务目录。
 
-填写指定表的一行时走 `cost-modeler-fill`；检查已填工作簿走 `cost-modeler-validate`。安装包里的 `templates/成本核算表格模板-v2.xlsx` 用于新表起步；`examples/` 只是随包最小教学案例。不要把开发工作区、规格目录或测试夹具当成日常业务目录。
+## 插件身份与离线 Release 附件
 
-# 来源、离线附件与未实测
-
-各包插件声明使用同一组身份字段：
+各宿主包共享同一插件身份声明（`owner.name: "ifoohoo"` 仅标识仓库组织）：
 
 ```json
 {
   "name": "cost-modeler",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }
 ```
 
-Foundation `0.23.0` 官方最小插件模板只有 `name`、`version`、`description`；本项目另填 `skills: "./skills/"`。没有 Codex 或 WorkBuddy 的 Foundation 专用模板。宿主描述里的 `hostId` 与技能根用来识别宿主，不是插件模板，也不是远端安装入口。
+GitHub Release 同时提供三份与公开仓 `dist/` 字节对应的可选离线压缩包（正常联网安装无需下载 ZIP）：
 
-四个远端安装合同来自各宿主官方入口，补齐 Foundation `0.23.0` 未覆盖处。它们不是 Foundation 模板，也不是向第三方公共插件目录投稿：
-
-1. Claude Code：`https://code.claude.com/docs/en/plugin-marketplaces`
-2. Grok：本机 CLI `1.0.46` 的 `plugin install --help` / `plugin update --help`；组合语法为 `owner/repo`、`@ref`、`#subdir`
-3. Codex：本机 CLI `codex-cli 0.154.0`；`https://developers.openai.com/codex/plugins/build`，获取 2026-10-04
-4. WorkBuddy：`https://www.codebuddy.cn/docs/workbuddy/Plugins`；已安装插件管理见 `https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Plug-In`。目录字段形态参考 CodeBuddy marketplace 说明；WorkBuddy 在界面添加 GitHub 源并安装。
-
-目录 `owner.name` 使用组织 `ifoohoo` 作为目录维护方，不是版权人或许可声明。
-
-三个 ZIP 是同一标签 Release 的可选离线附件，字节对应公开仓中的 `dist/` 目录。ZIP 不是正式安装前提。
-
-| 附件 ZIP | 公开仓中对应目录 | 给谁用 |
-|---|---|---|
-| `cost-modeler-claude.zip` | `dist/claude/cost-modeler/` | Claude Code；Grok 用同一份 |
-| `cost-modeler-codex.zip` | `dist/codex/cost-modeler/` | Codex |
-| `cost-modeler-workbuddy.zip` | `dist/workbuddy/cost-modeler/` | WorkBuddy |
-
-WorkBuddy 的 ZIP 顶层仍是旧布局：内层 `.codebuddy-plugin/marketplace.json` 的 `name` 为 `cost-modeler-local`，`owner.name` 为 `private`，`source` 为 `./plugins/cost-modeler`。那是离线附件结构，公开仓目录不使用这组值。
+| 离线附件 | 对应公开仓目录 | 适用宿主 |
+| --- | --- | --- |
+| `cost-modeler-claude.zip` | `dist/claude/cost-modeler/` | Claude Code、Grok |
+| `cost-modeler-codex.zip` | `dist/codex/cost-modeler/` | OpenAI Codex |
+| `cost-modeler-workbuddy.zip` | `dist/workbuddy/cost-modeler/` | WorkBuddy（离线包内层含本地 `cost-modeler-local` 清单） |

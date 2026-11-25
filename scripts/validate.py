@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """成本核算表格校验入口。
 
+<!-- @feature CM1 -->
+
 用法：
   .venv/bin/python scripts/validate.py 〈工作簿.xlsx〉 \\
     [--状态 正常态|初始化态] [--关账] [--校验日 YYYY-MM-DD] \\
@@ -37,18 +39,25 @@ def _validation_date(value: str) -> date:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="校验一份成本核算表格工作簿")
-    parser.add_argument("workbook", type=Path)
-    parser.add_argument("--状态", default="正常态", choices=("正常态", "初始化态"))
-    parser.add_argument("--关账", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="只读校验《成本核算表格模板》工作簿，输出确定规则报告、prefilter.json 与 association-context.json"
+    )
+    parser.add_argument("workbook", type=Path, help="待校验的成本核算工作簿（.xlsx）路径")
+    parser.add_argument(
+        "--状态",
+        default="正常态",
+        choices=("正常态", "初始化态"),
+        help="校验阶段口径：正常态要求登记完整，初始化态允许按过渡规则披露未登记与待下钻项（默认：正常态）",
+    )
+    parser.add_argument("--关账", action="store_true", help="按期次关账标准校验待下钻项与成本恒等式闭合")
     parser.add_argument("--校验日", type=_validation_date, help=say("cli.date_help"))
-    parser.add_argument("--预警值", type=Decimal, default=Decimal("0.10"))
-    parser.add_argument("--上限", type=Decimal, default=Decimal("0.15"))
-    parser.add_argument("--小数位", type=int, default=4)
-    parser.add_argument("--机器导出名录", type=Path)
-    parser.add_argument("--上一版表A", type=Path)
-    parser.add_argument("--已结期次副本", type=Path)
-    parser.add_argument("-o", type=Path)
+    parser.add_argument("--预警值", type=Decimal, default=Decimal("0.10"), help="平台功能与公共能力列一占比触发预警的阈值（默认：0.10）")
+    parser.add_argument("--上限", type=Decimal, default=Decimal("0.15"), help="平台功能与公共能力列一占比触发逐条复核的上限（默认：0.15）")
+    parser.add_argument("--小数位", type=int, default=4, help="份额与分摊比例重算保留的小数位数（默认：4）")
+    parser.add_argument("--机器导出名录", type=Path, help="包含 API清单、定时任务配置、监听器清单、页面路由 四个文本文件的目录")
+    parser.add_argument("--上一版表A", type=Path, help="用于版本变更比对的上一版表 A 工作簿路径")
+    parser.add_argument("--已结期次副本", type=Path, help="用于防篡改比对与建设当期认定的已结期次留存副本路径")
+    parser.add_argument("-o", type=Path, help="确定规则报告输出路径；省略时输出至标准输出")
     return parser.parse_args(argv)
 
 

@@ -1,0 +1,2 @@
+定时|XxlJob#autoApprove|战败自动审批
+定时|XxlJob#recycleTimeout|超时线索回收

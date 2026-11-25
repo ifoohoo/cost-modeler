@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""环境检查。只检查，不安装，不改文件。"""
+"""环境检查。只检查，不安装，不改文件。
+
+<!-- @feature CM4 -->
+"""
 from __future__ import annotations
 
 import argparse
@@ -53,17 +56,17 @@ def diagnose(root: Path | None = None) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="检查成本表技能族的运行环境")
-    parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser = argparse.ArgumentParser(description="只读检查软件成本建模技能族在业务目录下的 Python 环境与入口脚本")
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="目标业务目录根路径（默认：当前工作目录）")
     args = parser.parse_args(argv)
     result = diagnose(args.root)
     for item in result["checks"]:
         mark = "过" if item["ok"] else "缺"
         print(f"{mark} {item['name']}：{item['detail']}")
     if result["ready"]:
-        print("就绪。这一步不安装，也不改文件。")
+        print("就绪。本次诊断不安装依赖，也不修改任何文件。")
         return 0
-    print("还没就绪。下面是计划，本脚本不执行它。要做的话，先明确同意再按计划做。")
+    print("环境尚未就绪。以下为准备计划（本脚本只输出计划，请获用户明确同意后再按步骤执行）：")
     for index, step in enumerate(result["plan"], start=1):
         print(f"{index}. {step}")
     return 2

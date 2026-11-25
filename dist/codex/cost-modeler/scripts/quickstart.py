@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""按人说的话指到检查或填写引导。自己不跑校验，也不代填。"""
+"""按人说的话指到检查或填写引导。自己不跑校验，也不代填。
+
+<!-- @feature CM4 -->
+"""
 from __future__ import annotations
 
 import argparse
@@ -33,24 +36,24 @@ def route(text: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="把一句话指到成本表技能族的入口")
-    parser.add_argument("text")
+    parser = argparse.ArgumentParser(description="根据一句话需求路由至软件成本建模技能族的对应入口")
+    parser.add_argument("text", help="用户的原始需求语句")
     args = parser.parse_args(argv)
     decision = classify(args.text)
     if decision["kind"] == "limit":
         words = "、".join(decision["words"])
         print(
-            f"这句话里的「{words}」不在本族能做的两件事里。"
-            "本入口不删除、不安装、不改工作簿、不联网，也不调用别的技能。"
+            f"这句话里的「{words}」超出本技能族的职责边界。"
+            "本入口不删除数据、不安装组件、不直接改写工作簿、不联网，也不调用其他技能。"
             "这次不启动检查或填写。"
         )
-        print("若只是想了解能做什么，请改用说明入口 cost-modeler-help。")
+        print("如需了解完整能力范围，请调用说明入口 cost-modeler-help。")
         return 2
     if decision["kind"] == "choose":
-        print("这句话同时像检查和填写。两件事的结果不同，需要你选定一件。")
-        print("检查读取工作簿并给出报告，入口是 cost-modeler-validate。")
-        print("填写引导只根据现场事实推出表 B 这一行怎么填，入口是 cost-modeler-fill。")
-        print("这次不启动任何一项。请去掉另一件，再运行本入口。")
+        print("这句话同时包含检查和填写两类动作。两件事的结果不同，需要你选定一件。")
+        print("只读检查工作簿并出具报告，入口是 cost-modeler-validate。")
+        print("围绕指定行按现场事实推导并填写空白格，入口是 cost-modeler-fill。")
+        print("这次不启动任何一项。请明确其中一项后再运行。")
         return 2
     print(decision["entry"])
     return 0

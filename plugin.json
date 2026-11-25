@@ -1,0 +1,9 @@
+{
+  "name": "cost-modeler",
+  "displayName": "软件成本建模（Cost Modeler）",
+  "version": "0.1.4",
+  "description": "软件成本建模：成本核算表格校验与按事实填写",
+  "author": "广州市风荷科技有限公司",
+  "homepage": "https://github.com/ifoohoo/cost-modeler#readme",
+  "repository": "https://github.com/ifoohoo/cost-modeler"
+}

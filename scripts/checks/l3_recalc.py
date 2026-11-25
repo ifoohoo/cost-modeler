@@ -824,15 +824,18 @@ def _v38(book: WorkbookData, sink: Sink) -> None:
 def _v39(book: WorkbookData, sink: Sink) -> None:
     book.readable(sink, "V-39", '不计入', '分摊')
     pattern = re.compile(r"折算：\s*([\d.]+)\s*工时\s*×\s*([\d.]+)")
+    hours_pattern = re.compile(r"\d+(?:\.\d+)?\s*工时")
     targets = []
     for rec in book.logical("不计入"):
         targets.append(("不计入投入清单", rec, rec.get("投入量"), period_of(rec.get("来源证据", ""))))
     for rec in book.logical("分摊"):
         targets.append(("分摊表", rec, rec.get("池发生额"), rec.get("期次")))
-    if not any("折算：" in rec.get("来源证据", "") or rec.get("对象类别") == "线下工时" or re.search(r"\d+(?:\.\d+)? ?工时", rec.get("来源证据", "")) for _name, rec, _amt, _period in [(item[0], item[1], item[2], item[3]) for item in targets]):
-        # 上面的条件写得过绕。没有折算对象就不适用。
-        pass
-    interesting = [item for item in targets if "折算：" in item[1].get("来源证据", "") or item[1].get("对象类别") == "线下工时" or re.search(r"\d+(?:\.\d+)? ?工时", item[1].get("来源证据", ""))]
+    interesting = [
+        item for item in targets
+        if "折算：" in item[1].get("来源证据", "")
+        or item[1].get("对象类别") == "线下工时"
+        or hours_pattern.search(item[1].get("来源证据", ""))
+    ]
     if not interesting:
         sink.set_na("V-39", "工时折算行")
         return
@@ -840,8 +843,7 @@ def _v39(book: WorkbookData, sink: Sink) -> None:
     for name, rec, amount, period in interesting:
         evidence = rec.get("来源证据", "")
         matched = pattern.search(evidence)
-        label = rec.get("主键") or rec.get("成本池")
-        hours_written = rec.get("对象类别") == "线下工时" or re.search(r"\d+(?:\.\d+)?\s*工时", evidence)
+        hours_written = rec.get("对象类别") == "线下工时" or hours_pattern.search(evidence)
         if not matched and hours_written:
             sink.add_fail("V-39", line("V-39", say("l3_recalc.V-39.1", p0=name, p1=rec.row)))
         if not matched:
@@ -954,7 +956,7 @@ def _v41(book: WorkbookData, sink: Sink) -> None:
                 right = _systems(book, list(users))
             if right and right & set(fset(matched.group(1))):
                 reasons.append(say("frag.071"))
-            if not right and "`他系统接入：` 的行缺 `原池：`" not in "".join(reasons):
+            if not right and say("frag.071") not in reasons:
                 reasons.append(say("frag.073"))
         if reasons:
             sink.add_fail("V-41", line("V-41", say("l3_recalc.V-41.1", p0=rec.row, p1='／'.join(dict.fromkeys(reasons)))))

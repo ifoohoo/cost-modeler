@@ -204,7 +204,7 @@ def _v13_objects(book: WorkbookData, sink: Sink, rec, listed, wanted, costs: set
         sink.add_warn("V-13", line(
             "V-13",
             say("l2_ref.V-13.5", p0=rec.row, p1=rec.get('主键')),
-        ).replace("处理：该行不合格，改正后重跑。", "预警，不拦截。"))
+        ))
         building = False
     elif len(open_periods) == 1 or (not open_periods and len(current_periods) == 1):
         current = next(iter(open_periods or current_periods))

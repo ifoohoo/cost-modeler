@@ -1,0 +1,13 @@
+接口|POST /api/follow/result|提交
+接口|GET /api/clue/detail|查询
+接口|GET /api/customer/query|查询
+接口|POST /api/clue|登记
+接口|POST /api/clue/assign|分配
+接口|GET /api/clue/pool|查询
+接口|POST /api/auth/login|登录
+接口|GET /api/dealer/quota|查询
+接口|POST /api/clue/grade|评级
+接口|POST /api/clue/grade/confirm|定级
+接口|POST /api/testdrive/book|预约
+接口|POST /api/testdrive/cancel|取消
+接口|POST /api/sms/send|发送

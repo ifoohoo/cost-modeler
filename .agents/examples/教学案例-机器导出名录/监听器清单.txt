@@ -1,0 +1,3 @@
+消费者|clue.status.changed clue-follow-group|线索状态变更
+事件|ClueCreated ClueBroadcastHandler|线索建档广播
+消费者|clue.graded grade-sync-group|评级结果同步
