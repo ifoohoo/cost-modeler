@@ -1,6 +1,6 @@
-# 软件成本建模（Cost Modeler）0.1.4 安装与使用指南
+# 软件成本建模（Cost Modeler）0.1.5 安装与使用指南
 
-插件标识为 `cost-modeler`（中文名：**软件成本建模**），当前版本 `0.1.4`。正式安装与升级通过公开发行仓库 `ifoohoo/cost-modeler` 的各宿主官方远端入口完成，默认跟踪 `main` 分支；如需锁定特定版本，请指定不可变 Git 标签 `cost-modeler-v0.1.4`（锁定标签后宿主更新命令不会自动切往新标签）。
+插件标识为 `cost-modeler`（中文名：**软件成本建模**），当前版本 `0.1.5`。正式安装与升级通过公开发行仓库 `ifoohoo/cost-modeler` 的各宿主官方远端入口完成，默认跟踪 `main` 分支；如需锁定特定版本，请指定不可变 Git 标签 `cost-modeler-v0.1.5`（锁定标签后宿主更新命令不会自动切往新标签）。
 
 本技能族固定提供五个入口：
 
@@ -53,7 +53,7 @@
 | WorkBuddy | 插件页添加 `https://github.com/ifoohoo/cost-modeler.git`，安装 `cost-modeler` |
 | Google Antigravity | 插件根目录提供 `plugin.json` 与 `.agents/skills/`（克隆或复制到插件目录即用） |
 
-> 说明：Foundation `0.23.0` 宿主注册表未单独定义 `grok` `hostId`，Grok 与 Claude Code 直接共用 `dist/claude/cost-modeler/` 插件包（已在 Grok 环境实测加载并完成业务填写；其余宿主的线上远端拉取命令按各宿主官方文档与 CLI 帮助整理，公开仓根目录市场清单仅作本仓库安装入口）。Antigravity 同步读取公开仓库根目录 `plugin.json`、`skills/` 与工作区 `.agents/skills/`。
+> 说明：Foundation `0.39.2` 宿主注册表已收录 `grok`（预览手动宿主），Grok 与 Claude Code 继续共用已实测通过的 `dist/claude/cost-modeler/` 插件包（其余宿主的线上远端拉取命令按各宿主官方文档与 CLI 帮助整理，公开仓根目录市场清单仅作本仓库安装入口）。Antigravity 同步读取公开仓库根目录 `plugin.json`、`skills/` 与工作区 `.agents/skills/`。
 
 ### 1. Claude Code
 
@@ -70,7 +70,7 @@ claude plugin install cost-modeler@cost-modeler
 claude plugin update cost-modeler@cost-modeler
 ```
 
-如需锁定版本，添加市场时使用 `ifoohoo/cost-modeler#cost-modeler-v0.1.4`。
+如需锁定版本，添加市场时使用 `ifoohoo/cost-modeler#cost-modeler-v0.1.5`。
 
 ### 2. Grok（核对 CLI `1.0.46`）
 
@@ -80,7 +80,7 @@ grok plugin install ifoohoo/cost-modeler#dist/claude/cost-modeler
 grok plugin update cost-modeler
 
 # 锁定特定发布标签
-grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.4#dist/claude/cost-modeler
+grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.5#dist/claude/cost-modeler
 ```
 
 安装后新开会话即可使用 `/cost-modeler-fill`、`/cost-modeler-validate` 等入口。
@@ -99,7 +99,7 @@ codex plugin marketplace upgrade cost-modeler
 codex plugin add cost-modeler@cost-modeler
 
 # 锁定特定发布标签
-codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.4
+codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.5
 codex plugin add cost-modeler@cost-modeler
 ```
 
@@ -137,7 +137,7 @@ https://github.com/ifoohoo/cost-modeler.git
 ```json
 {
   "name": "cost-modeler",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }
