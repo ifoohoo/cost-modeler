@@ -1,6 +1,6 @@
-# 软件成本建模（Cost Modeler）0.1.5 安装与使用指南
+# 软件成本建模（Cost Modeler）0.1.6 安装与使用指南
 
-插件标识为 `cost-modeler`（中文名：**软件成本建模**），当前版本 `0.1.5`。正式安装与升级通过公开发行仓库 `ifoohoo/cost-modeler` 的各宿主官方远端入口完成，默认跟踪 `main` 分支；如需锁定特定版本，请指定不可变 Git 标签 `cost-modeler-v0.1.5`（锁定标签后宿主更新命令不会自动切往新标签）。
+插件标识为 `cost-modeler`（中文名：**软件成本建模**），当前版本 `0.1.6`。正式安装与升级通过公开发行仓库 `ifoohoo/cost-modeler` 的各宿主官方远端入口完成，默认跟踪 `main` 分支；如需锁定特定版本，请指定不可变 Git 标签 `cost-modeler-v0.1.6`（锁定标签后宿主更新命令不会自动切往新标签）。
 
 本技能族固定提供五个入口：
 
@@ -70,7 +70,7 @@ claude plugin install cost-modeler@cost-modeler
 claude plugin update cost-modeler@cost-modeler
 ```
 
-如需锁定版本，添加市场时使用 `ifoohoo/cost-modeler#cost-modeler-v0.1.5`。
+如需锁定版本，添加市场时使用 `ifoohoo/cost-modeler#cost-modeler-v0.1.6`。
 
 ### 2. Grok（核对 CLI `1.0.46`）
 
@@ -80,7 +80,7 @@ grok plugin install ifoohoo/cost-modeler#dist/claude/cost-modeler
 grok plugin update cost-modeler
 
 # 锁定特定发布标签
-grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.5#dist/claude/cost-modeler
+grok plugin install ifoohoo/cost-modeler@cost-modeler-v0.1.6#dist/claude/cost-modeler
 ```
 
 安装后新开会话即可使用 `/cost-modeler-fill`、`/cost-modeler-validate` 等入口。
@@ -99,7 +99,7 @@ codex plugin marketplace upgrade cost-modeler
 codex plugin add cost-modeler@cost-modeler
 
 # 锁定特定发布标签
-codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.5
+codex plugin marketplace add ifoohoo/cost-modeler --ref cost-modeler-v0.1.6
 codex plugin add cost-modeler@cost-modeler
 ```
 
@@ -137,7 +137,7 @@ https://github.com/ifoohoo/cost-modeler.git
 ```json
 {
   "name": "cost-modeler",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "软件成本建模：成本核算表格校验与按事实填写",
   "skills": "./skills/"
 }
